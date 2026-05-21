@@ -119,13 +119,13 @@ def test_sklearn_importable():
 def test_sklearn_train_test_split():
     from sklearn.model_selection import train_test_split
 
-    X = np.arange(100).reshape(50, 2)  # noqa: N806
+    x = np.arange(100).reshape(50, 2)
     y = np.zeros(50)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )  # noqa: N806
-    assert len(X_train) == 40
-    assert len(X_test) == 10
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
+    )
+    assert len(x_train) == 40
+    assert len(x_test) == 10
 
 
 # ---------------------------------------------------------------------------
