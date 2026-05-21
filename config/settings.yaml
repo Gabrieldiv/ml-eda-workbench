@@ -1,0 +1,33 @@
+data:
+  # Path to the directory containing your datasets
+  path: "data/"
+  # Name of the training CSV file (place it inside data/)
+  train_file: "train.csv"
+  # Name of the test / hold-out CSV file
+  test_file: "test.csv"
+  # Name of the column you are trying to predict
+  target_column: "target"
+
+experiment:
+  # Seed used for all random operations — change to get different splits
+  random_seed: 42
+  # Fraction of data held out for evaluation (0.2 = 20%)
+  test_size: 0.2
+  # Number of folds used for cross-validation
+  cv_folds: 5
+
+plots:
+  # Default figure size in inches [width, height]
+  figure_size: [12, 6]
+  # Matplotlib style — see https://matplotlib.org/stable/gallery/style_sheets/
+  style: "seaborn-v0_8-whitegrid"
+  # Dots per inch for saved figures
+  dpi: 150
+  # Directory where figures are saved by helper utilities
+  save_dir: "outputs/figures/"
+
+profiling:
+  # Set to true for a faster (less detailed) ydata-profiling report
+  minimal: false
+  # Output path for the HTML profiling report
+  output_file: "outputs/profile_report.html"

@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments (uv manages .venv automatically)
+.venv/
+venv/
+env/
+
+# uv
+# uv.lock is intentionally committed for reproducibility
+
+# Pytest + coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data files — add your own datasets to data/ but don't commit them
+data/*.csv
+data/*.tsv
+data/*.parquet
+data/*.json
+data/*.xlsx
+data/*.xls
+data/*.db
+data/*.sqlite
+
+# Generated outputs
+outputs/
+reports/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ruff cache
+.ruff_cache/
+
+# Temp install bin used during CI bootstrap (not needed in repo)
+.uv-bin/
