@@ -41,6 +41,7 @@ data/*.sqlite
 
 # Generated outputs
 outputs/
+output/
 reports/
 
 # macOS
