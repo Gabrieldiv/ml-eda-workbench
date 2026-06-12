@@ -2,20 +2,20 @@ datasets:
   wine:
     separator: ","
     encoding: "utf-8"
-    coluna_id: "id"
-    coluna_classe: "diagnostico"
+    id_column: "id"
+    target_column: "diagnostico"
   
   titanic_train:
     separator: ","
     encoding: "utf-8"
-    coluna_id: "PassengerId"
-    coluna_classe: "Survived"
+    id_column: "PassengerId"
+    target_column: "Survived"
   
   iris:
-    separator: ";"
+    separator: ","
     encoding: "utf-8"
-    coluna_id: null
-    coluna_classe: "species"
+    id_column: null
+    target_column: "specie"
 
 data:
   # Path to the directory containing your datasets

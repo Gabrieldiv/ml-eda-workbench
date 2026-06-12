@@ -3,7 +3,8 @@
 import os
 import pandas as pd
 import pytest
-from eda_workbench.io import load_config, load_dataset, save_txt
+from eda_workbench.io import load_config, get_dataset_config, load_dataset, save_txt
+
 
 def test_load_dataset_valid_csv(tmp_path):
     """Loads a valid CSV and returns a DataFrame."""
@@ -14,21 +15,28 @@ def test_load_dataset_valid_csv(tmp_path):
     assert isinstance(df, pd.DataFrame)
     assert df.shape == (2, 2)
 
-def test_load_config_unknown_dataset():
-    """Raises KeyError for datasets not configured in the YAML."""
-    with pytest.raises(KeyError):
-        load_config("dataset_que_nao_existe")
 
 def test_load_dataset_invalid_extension():
     """Raises ValueError for non-CSV files."""
     with pytest.raises(ValueError):
         load_dataset("file.txt", {})
 
+
 def test_load_config_valid_dataset():
-    """Returns config dict for a known dataset."""
-    config = load_config("wine")
-    assert config["separator"] == ","
-    assert config["encoding"] == "utf-8"
+    """Returns dataset-specific config for registered datasets."""
+    config = load_config()
+    dataset_config = get_dataset_config("wine", config)
+    assert dataset_config["separator"] == ","
+    assert dataset_config["encoding"] == "utf-8"
+
+
+def test_load_config_unknown_dataset():
+    """Returns default config for datasets not registered in the YAML."""
+    config = load_config()
+    dataset_config = get_dataset_config("non_existent_dataset", config)
+    assert dataset_config["separator"] == ","
+    assert dataset_config["id_column"] is None
+
 
 def test_save_txt(tmp_path):
     """Saves report content to a TXT file with correct name."""

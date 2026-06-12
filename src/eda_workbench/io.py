@@ -4,30 +4,40 @@ import os
 import pandas as pd
 import yaml
 
-# -----------------------------------------------------------------------------
-# LOADING
-# -----------------------------------------------------------------------------
 
-def load_config(dataset_name: str, config_path: str = "config/settings.yaml") -> dict:
-    """Load settings for a specific dataset from the YAML configuration file.
+def load_config(config_path: str = "config/settings.yaml") -> dict:
+    """Load the full YAML configuration file.
 
     Args:
-        dataset_name: Name of the dataset (e.g. "wine", "titanic_train").
         config_path: Path to the configuration file. Default: "config/settings.yaml".
 
     Returns:
-        Dictionary with the dataset settings.
-
-    Raises:
-        KeyError: If the dataset is not configured in the YAML file.
+        Dictionary with all configuration settings.
     """
     with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+        return yaml.safe_load(f)
 
-    if dataset_name not in config["datasets"]:
-        raise KeyError(f"Dataset '{dataset_name}' not found in {config_path}.")
 
-    return dict(config["datasets"][dataset_name])
+def get_dataset_config(dataset_name: str, config: dict) -> dict:
+    """Return dataset-specific config, or default CSV settings if not registered.
+
+    Args:
+        dataset_name: Name of the dataset (e.g. "wine", "titanic_train").
+        config: Full configuration dictionary loaded from YAML.
+
+    Returns:
+        Dictionary with separator, encoding, id_column and target_column.
+    """
+    datasets = config.get("datasets", {})
+    if dataset_name in datasets:
+        return dict(datasets[dataset_name])
+
+    return {
+        "separator": ",",
+        "encoding": "utf-8",
+        "id_column": None,
+        "target_column": "target",
+    }
 
 
 def load_dataset(csv_path: str, config: dict) -> pd.DataFrame:
@@ -48,9 +58,6 @@ def load_dataset(csv_path: str, config: dict) -> pd.DataFrame:
 
     return pd.read_csv(csv_path, sep=config["separator"], encoding=config["encoding"])
 
-# -----------------------------------------------------------------------------
-# OUTPUT
-# -----------------------------------------------------------------------------
 
 def save_txt(content: str, csv_path: str, output_dir: str = "output") -> str:
     """Save report content to a TXT file.

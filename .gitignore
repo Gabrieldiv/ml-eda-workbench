@@ -31,6 +31,9 @@ htmlcov/
 
 # Data files — add your own datasets to data/ but don't commit them
 data/*.csv
+!data/wine.csv
+!data/iris.csv
+!data/titanic_train.csv
 data/*.tsv
 data/*.parquet
 data/*.json
