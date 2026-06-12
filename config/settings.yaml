@@ -1,3 +1,22 @@
+datasets:
+  wine:
+    separator: ","
+    encoding: "utf-8"
+    id_column: "id"
+    target_column: "diagnostico"
+  
+  titanic_train:
+    separator: ","
+    encoding: "utf-8"
+    id_column: "PassengerId"
+    target_column: "Survived"
+  
+  iris:
+    separator: ","
+    encoding: "utf-8"
+    id_column: null
+    target_column: "specie"
+
 data:
   # Path to the directory containing your datasets
   path: "data/"
