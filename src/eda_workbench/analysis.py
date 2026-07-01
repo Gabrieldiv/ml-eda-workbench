@@ -65,8 +65,10 @@ def zero_values(df: pd.DataFrame, config: dict) -> str:
     target_column = config.get("target_column")
     exclude = {col for col in [id_column, target_column] if col is not None}
 
-    df_feat = df.drop(columns=[col for col in exclude if col in df.columns])
-    zero_counts = (df_feat == 0).sum()
+    df_feat = df.drop(columns=list(exclude), errors="ignore").select_dtypes(
+        include="number"
+    )
+    zero_counts = df_feat.eq(0).sum()
     zero_counts = zero_counts[zero_counts > 0]
 
     lines = ["Characteristics with zero values:"]
