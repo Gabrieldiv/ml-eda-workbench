@@ -2,7 +2,12 @@
 
 import os
 
-from eda_workbench.analysis import basic_info, missing_values, zero_values
+from eda_workbench.analysis import (
+    basic_info,
+    duplicated_instances,
+    missing_values,
+    zero_values,
+)
 from eda_workbench.io import get_dataset_config, load_config, load_dataset, save_txt
 
 # -----------------------------------------------------------------------------
@@ -58,6 +63,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
             f"\nInstances with missing values: {missing_values(df)} out of {len(df)}"
         )
         report += f"\n{zero_values(df, dataset_config)}"
+        report += f"\n{duplicated_instances(df, dataset_config)}"
 
         print(report)
 
