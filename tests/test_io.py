@@ -40,6 +40,40 @@ def test_load_config_unknown_dataset():
     assert dataset_config["id_column"] is None
 
 
+def test_load_config_explicit_path(tmp_path):
+    """Loads config from an explicitly given path, ignoring the default candidates."""
+    custom_config = tmp_path / "custom.yaml"
+    custom_config.write_text("datasets:\n  toy:\n    id_column: pk\n")
+
+    config = load_config(config_path=custom_config)
+    assert config == {"datasets": {"toy": {"id_column": "pk"}}}
+
+
+def test_load_config_explicit_path_missing_returns_empty(tmp_path):
+    """Returns an empty dict when the explicitly given path does not exist."""
+    missing_path = tmp_path / "does_not_exist.yaml"
+    assert load_config(config_path=missing_path) == {}
+
+
+def test_load_config_falls_back_to_repo_default(tmp_path, monkeypatch):
+    """Falls back to the repository's default config when cwd has none."""
+    monkeypatch.chdir(tmp_path)  # no config/settings.yaml here
+
+    config = load_config()
+    assert "datasets" in config
+    assert "wine" in config["datasets"]
+
+
+def test_load_config_returns_empty_when_no_candidate_exists(tmp_path, monkeypatch):
+    """Returns an empty dict when neither the cwd nor the default path has a config file."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "eda_workbench.io._DEFAULT_CONFIG_PATH", tmp_path / "missing.yaml"
+    )
+
+    assert load_config() == {}
+
+
 def test_save_txt(tmp_path):
     """Saves report content to a TXT file with correct name."""
     path = save_txt("hello", "data/wine.csv", output_dir=str(tmp_path))
