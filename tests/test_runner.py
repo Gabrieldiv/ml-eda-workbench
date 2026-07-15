@@ -37,3 +37,6 @@ def test_process_folder_generates_reports(tmp_path):
 
     reports = list(output_dir.glob("*.txt")) if output_dir.exists() else []
     assert len(reports) > 0
+
+    content = reports[0].read_text(encoding="utf-8")
+    assert "Duplicated instances" in content
