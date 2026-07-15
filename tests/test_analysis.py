@@ -142,7 +142,7 @@ def test_duplicated_instances_multiple_groups():
     assert "2 instances - IDs/rows: 4, 5" in result
 
 
-def test_duplicated_instances_same_features_different_target():
+def test_duplicated_instances_same_features_different_targets():
     """Still counts as duplicate even if the target differs (target is ignored)."""
     df = pd.DataFrame(
         {
@@ -154,6 +154,7 @@ def test_duplicated_instances_same_features_different_target():
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
     assert "2 instances - IDs/rows: 1, 2" in result
+    assert "2 instances - different targets: 0, 1" in result
 
 
 def test_duplicated_instances_empty_dataframe():
@@ -176,3 +177,17 @@ def test_duplicated_instances_nan_values_match():
     config = {"id_column": "id", "target_column": None}
     result = duplicated_instances(df, config)
     assert "2 instances - IDs/rows: 1, 2" in result
+
+
+def test_duplicated_instances_same_target_no_conflict_flag():
+    """Does not flag a conflict when duplicated instances share the same target."""
+    df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "a": [10, 10],
+            "target": [0, 0],
+        }
+    )
+    config = {"id_column": "id", "target_column": "target"}
+    result = duplicated_instances(df, config)
+    assert "different targets" not in result
