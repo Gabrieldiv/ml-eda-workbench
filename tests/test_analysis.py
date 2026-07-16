@@ -116,15 +116,15 @@ def test_duplicated_instances_one_group():
     )
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/rows: 1, 2" in result
+    assert "2 instances - IDs/row index: 1, 2" in result
 
 
-def test_duplicated_instances_uses_row_position_without_id():
+def test_duplicated_instances_uses_row_index_without_id():
     """Falls back to row position when there is no ID column."""
     df = pd.DataFrame({"a": [10, 10], "b": [20, 20]})
     config = {"id_column": None, "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/rows: 0, 1" in result
+    assert "2 instances - IDs/row index: 0, 1" in result
 
 
 def test_duplicated_instances_multiple_groups():
@@ -138,8 +138,8 @@ def test_duplicated_instances_multiple_groups():
     )
     config = {"id_column": "id", "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/rows: 1, 2" in result
-    assert "2 instances - IDs/rows: 4, 5" in result
+    assert "2 instances - IDs/row index: 1, 2" in result
+    assert "2 instances - IDs/row index: 4, 5" in result
 
 
 def test_duplicated_instances_same_features_different_targets():
@@ -153,7 +153,7 @@ def test_duplicated_instances_same_features_different_targets():
     )
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/rows: 1, 2" in result
+    assert "2 instances - IDs/row index: 1, 2" in result
     assert "2 instances - different targets: 0, 1" in result
 
 
@@ -176,7 +176,7 @@ def test_duplicated_instances_nan_values_match():
     )
     config = {"id_column": "id", "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/rows: 1, 2" in result
+    assert "2 instances - IDs/row index: 1, 2" in result
 
 
 def test_duplicated_instances_same_target_no_conflict_flag():

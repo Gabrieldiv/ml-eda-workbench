@@ -14,7 +14,7 @@ def duplicated_instances(df: pd.DataFrame, config: dict) -> str:
 
     Returns:
         Formatted string listing each group of duplicated instances (identified
-        by ID when available, otherwise by row position), or a message stating
+        by ID when available, otherwise by row index), or a message stating
         none were found.
     """
     id_column = config.get("id_column")
@@ -40,7 +40,7 @@ def duplicated_instances(df: pd.DataFrame, config: dict) -> str:
         else:
             labels = [str(i) for i in row_indices]
 
-        lines.append(f"{len(labels)} instances - IDs/rows: {', '.join(labels)}")
+        lines.append(f"{len(labels)} instances - IDs/row index: {', '.join(labels)}")
 
         if target_column and target_column in df.columns:
             labels_target = df.loc[row_indices, target_column].astype(str)
