@@ -1,20 +1,12 @@
+import numpy as np
 import pandas as pd
 
 
-def pearson_correlation(df: pd.DataFrame, config: dict) -> str:
+def redundant_features(df: pd.DataFrame, config: dict, threshold: float) -> str:
+    """..."""
     id_column = config.get("id_column")
     target_column = config.get("target_column")
-    lines = ["Pearson correlation for every characteristic:"]
-
-    if (
-        not target_column
-        or target_column not in df.columns
-        or not pd.api.types.is_numeric_dtype(df[target_column])
-    ):
-        lines.append(
-            "Pearson correlation not viable, target isn't numeric or doesn't exist."
-        )
-        return "\n".join(lines)
+    lines = ["Redundant feature pairs (Pearson correlation):"]
 
     exclude = {col for col in [id_column, target_column] if col is not None}
     df_feat = df.drop(columns=list(exclude), errors="ignore")
@@ -27,13 +19,32 @@ def pearson_correlation(df: pd.DataFrame, config: dict) -> str:
             f"Skipped non-numeric columns: {', '.join(sorted(skipped_features))}"
         )
 
-    if numeric_features:
-        df_numeric = df_feat[list(numeric_features)]
-        correlations = df_numeric.corrwith(df[target_column])
-        correlations = correlations.reindex(
-            correlations.abs().sort_values(ascending=False).index
+    if not numeric_features:
+        lines.append("None")
+        return "\n".join(lines)
+
+    df_numeric = df_feat[list(numeric_features)]
+    correlation_matrix = df_numeric.corr()
+    mask = np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
+    correlation_pairs = correlation_matrix.where(mask).stack().dropna()
+    redundant_pairs = correlation_pairs[correlation_pairs.abs() >= threshold]
+
+    if redundant_pairs.empty:
+        lines.append("None")
+        return "\n".join(lines)
+
+    n_features = len(correlation_matrix)
+    mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_features - 1)
+
+    for (feature_a, feature_b), corr_value in redundant_pairs.items():
+        if mean_abs_corr[feature_a] >= mean_abs_corr[feature_b]:
+            suggested_drop = feature_a
+        else:
+            suggested_drop = feature_b
+
+        lines.append(
+            f"{feature_a} <-> {feature_b}: {corr_value:.3f} "
+            f"(suggest dropping: {suggested_drop})"
         )
-        for feature_name, corr_value in correlations.items():
-            lines.append(f"{feature_name}: {corr_value:.3f}")
 
     return "\n".join(lines)
