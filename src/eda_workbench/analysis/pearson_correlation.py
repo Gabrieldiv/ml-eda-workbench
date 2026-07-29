@@ -2,68 +2,84 @@ import numpy as np
 import pandas as pd
 
 
-# importa o pandas pois iremos precisar
 def pearson_correlation(df: pd.DataFrame, config: dict, limit: float) -> str:
-    # declara a função
+    """Report pairs of highly correlated (redundant) characteristics.
+
+    Compares every pair of numeric characteristics via Pearson correlation,
+    excluding the ID and target columns. Pairs with absolute correlation
+    at or above `limit` are flagged as redundant. For each flagged pair,
+    suggests which characteristic to drop based on its average correlation with
+    every other characteristic — the one that overlaps more with the rest of the
+    dataset is suggested for removal.
+
+    Args:
+        df: DataFrame with the dataset data.
+        config: Dictionary with dataset settings (id_column, target_column).
+        limit: Absolute Pearson correlation value (0 to 1) above which two
+            characteristics are considered redundant.
+
+    Returns:
+        Formatted string listing each redundant pair, their correlation,
+        and which characteristics are suggested for removal. Also lists any
+        non-numeric characteristics that were skipped.
+    """
+
     id_column = config.get("id_column")
-    # pega o nome da coluna ID
     target_column = config.get("target_column")
-    # pega o nome da coluna target
-    lines = ["Pearson correlation for every column:"]
-    # cria uma lista que conterá as colunas redundantes
+    lines = ["Pearson correlation for every characteristic:"]
 
     exclude = {col for col in [id_column, target_column] if col is not None}
-    # cria um conjunto com cada coluna na lista que não for none, a coluna tem que existir
     df_feat = df.drop(columns=list(exclude), errors="ignore")
-    # cria um dataset novo, sem a colunas id e target, se der algum erro, ignore
 
-    numeric_features = set(df_feat.select_dtypes(include="number").columns)
-    # pega só as colunas numéricas, para evitar tentar achar a correlação entre textos
-    skipped_features = set(df_feat.select_dtypes(exclude="number").columns)
-    # pega só as colunas não numéricas, para dizer no relatório quais são
+    numeric_columns = list(df_feat.select_dtypes(include="number").columns)
+    skipped_columns = list(df_feat.select_dtypes(exclude="number").columns)
 
-    if skipped_features:
-        # se existir colunas não numéricas
-        lines.append("Skipped non-numeric columns:")
-        lines.append("\n".join(sorted(skipped_features)))
-        # coloca no relatório quais colunas são as não númericas, uma abaixo da outra
+    if skipped_columns:
+        lines.append("Skipped non-numeric characteristics:")
+        lines.append("\n".join(skipped_columns))
 
-    if numeric_features:
-        # se existir colunas numéricas
-        df_numeric = df_feat[sorted(numeric_features)]
-        # cria um dataset auxiliar somente com as colunas de dados númericos
+    if numeric_columns:
+        df_numeric = df_feat[numeric_columns]
         correlation_matrix = df_numeric.corr()
-        # cria uma matriz com a correlação de todas as colunas entre si do dataset auxiliar
+        labeled_matrix = correlation_matrix.fillna("NOT_COMPUTABLE")
         mask = np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
-        # pega somente o triângulo superior, correlações não repetidas e não auto-comparadas
-        correlation_pairs = correlation_matrix.where(mask).stack().dropna()  # noqa: PD013
-        # monta uma lista apenas com as correlações não repetidas e não auto-comparadas
-        redundant_pairs = correlation_pairs[correlation_pairs.abs() >= limit]
-        # cria uma lista apenas com as colunas de dados redundantes
+        correlation_pairs_raw = labeled_matrix.where(mask).stack().dropna()  # noqa: PD013
 
-        if redundant_pairs.empty:
-            # se não houverem pares reduntantes.
-            lines.append(f"All columns correlations below the defined limit: {limit} ")
-            # diz que todas as colunas tem redundância abaixo do limite estabelecido.
+        sentinel = correlation_pairs_raw == "NOT_COMPUTABLE"
+        nan_pairs = correlation_pairs_raw[sentinel]
+
+        correlation_pairs = correlation_pairs_raw[~sentinel].astype(float)
+        redundant_pairs = correlation_pairs[correlation_pairs.abs() >= limit]
+
+        if nan_pairs.empty and redundant_pairs.empty:
+            lines.append(
+                f"All characteristics correlations below the defined limit: {limit} "
+            )
 
         else:
-            n_features = len(correlation_matrix)
-            # pega a quantidade de colunas
-            mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_features - 1)
-            # pega a correlação média de cada coluna com todas as outras
-
-            for (feature_a, feature_b), corr_value in redundant_pairs.items():
-                if mean_abs_corr[feature_a] >= mean_abs_corr[feature_b]:
-                    suggested_drop = feature_a
-                else:
-                    suggested_drop = feature_b
-
+            if not nan_pairs.empty:
                 lines.append(
-                    f"{feature_a} <-> {feature_b}: {corr_value:.3f} "
-                    f"(suggest dropping: {suggested_drop})"
+                    "Could not compute correlation (not enough variation/data):"
                 )
-                # para cada par redundante, sugere eliminar a que mais se correlaciona com todas as outras
+                for column_a, column_b in nan_pairs.index:
+                    lines.append(f"{column_a} <-> {column_b}")
+
+            if not redundant_pairs.empty:
+                n_columns = len(correlation_matrix)
+                mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_columns - 1)
+
+                for (column_a, column_b), corr_value in redundant_pairs.items():
+                    if mean_abs_corr[column_a] >= mean_abs_corr[column_b]:
+                        suggested_drop = column_a
+                    else:
+                        suggested_drop = column_b
+
+                    lines.append(
+                        f"{column_a} <-> {column_b}: {corr_value:.3f} "
+                        f"(suggest dropping: {suggested_drop})"
+                    )
+
     else:
-        lines.append("Numeric columns not found.")
+        lines.append("Numeric characteristics not found.")
 
     return "\n".join(lines)
