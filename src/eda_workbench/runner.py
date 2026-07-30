@@ -2,8 +2,19 @@
 
 import os
 
-from eda_workbench.analysis import basic_info, missing_values, zero_values
-from eda_workbench.io import get_dataset_config, load_config, load_dataset, save_txt
+from eda_workbench.analysis import (
+    basic_info,
+    duplicated_instances,
+    missing_values,
+    pearson_correlation,
+    zero_values,
+)
+from eda_workbench.io import (
+    get_dataset_config,
+    load_config,
+    load_dataset,
+    save_markdown,
+)
 
 # -----------------------------------------------------------------------------
 # ORCHESTRATION
@@ -33,7 +44,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
     """Process all CSV files in a folder and generate EDA reports.
 
     For each CSV found, loads the dataset, runs the analyses,
-    and saves the report as a TXT file in the output folder.
+    and saves the report as a Markdown file in the output folder.
 
     Args:
         data_dir: Path to the folder containing CSV files. Default: "data".
@@ -44,6 +55,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         return
 
     config = load_config()
+    limit = config.get("correlation", {}).get("drop_threshold", 0.9)
 
     for csv_path in csv_files:
         print(f"\nProcessing: {csv_path}")
@@ -53,15 +65,21 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         dataset_config = get_dataset_config(base_name, config)
 
         df = load_dataset(csv_path, dataset_config)
-        report = basic_info(df, dataset_config["id_column"])
+
+        report = f"# EDA Report — {base_name}\n\n"
+        report += basic_info(df, dataset_config["id_column"])
+        report += "\n\n## Missing Values\n"
         report += (
-            f"\nInstances with missing values: {missing_values(df)} out of {len(df)}"
+            f"- **Instances with missing values**: {missing_values(df)} "
+            f"out of {len(df)}"
         )
-        report += f"\n{zero_values(df, dataset_config)}"
+        report += f"\n\n{zero_values(df, dataset_config)}"
+        report += f"\n\n{duplicated_instances(df, dataset_config)}"
+        report += f"\n\n{pearson_correlation(df, dataset_config, limit)}"
 
         print(report)
 
-        path = save_txt(report, csv_path, output_dir=output_dir)
+        path = save_markdown(report, csv_path, output_dir=output_dir)
         print(f"\nReport saved to: {path}")
 
 

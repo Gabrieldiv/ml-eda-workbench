@@ -35,6 +35,12 @@ experiment:
   # Number of folds used for cross-validation
   cv_folds: 5
 
+correlation:
+  # Pearson correlation threshold (absolute value) above which two
+  # characteristics are considered redundant. Used to flag candidates
+  # for removal and reduce dimensionality.
+  drop_threshold: 0.9
+
 plots:
   # Default figure size in inches [width, height]
   figure_size: [12, 6]
