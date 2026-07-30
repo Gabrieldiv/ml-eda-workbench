@@ -43,6 +43,12 @@ def pearson_correlation(df: pd.DataFrame, config: dict, limit: float) -> str:
         lines.append("- **No numeric characteristics found**")
         return "\n".join(lines)
 
+    if len(numeric_columns) < 2:
+        lines.append(
+            "- **Not enough numeric characteristics to compare (at least two required)**"
+        )
+        return "\n".join(lines)
+
     df_numeric = df_feat[numeric_columns]
     correlation_matrix = df_numeric.corr()
     labeled_matrix = correlation_matrix.fillna("NOT_COMPUTABLE")
@@ -69,8 +75,8 @@ def pearson_correlation(df: pd.DataFrame, config: dict, limit: float) -> str:
             lines.append(f"- `{column_a}` <-> `{column_b}`")
 
     if not redundant_pairs.empty:
-        n_columns = len(correlation_matrix)
-        mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_columns - 1)
+        no_diagonal = ~np.eye(len(correlation_matrix), dtype=bool)
+        mean_abs_corr = correlation_matrix.abs().where(no_diagonal).mean()
 
         rows = []
         for (column_a, column_b), corr_value in redundant_pairs.items():

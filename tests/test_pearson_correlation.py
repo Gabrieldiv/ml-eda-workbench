@@ -1,5 +1,6 @@
 """Unit tests for pearson_correlation."""
 
+import numpy as np
 import pandas as pd
 
 from eda_workbench.analysis import pearson_correlation
@@ -132,3 +133,41 @@ def test_blank_line_separates_skipped_columns_from_nan_pairs():
         "**Skipped non-numeric characteristics**: nome\n\n"
         "**Could not compute correlation" in result
     )
+
+
+def test_not_enough_numeric_columns():
+    """Reports that there are not enough numeric characteristics to compare."""
+    df = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "nome": ["Ana", "Bruno", "Carlos"],
+            "a": [10, 20, 30],
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = pearson_correlation(df, config, limit=0.9)
+    assert "**Not enough numeric characteristics to compare" in result
+
+
+def test_drop_suggestion_ignores_uncomputable_pairs():
+    """A missing correlation must not count as zero when averaging, since
+    that could unfairly bias the drop recommendation toward the wrong column.
+
+    Here, a-b is redundant, a-c is uncomputable (a and c never overlap),
+    and b-c is computable but weak. a's only real relationship (with b) is
+    perfect, so a should be the one suggested for removal — not b, which
+    the old (buggy) averaging would have incorrectly picked.
+    """
+    df = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4, 5, 6],
+            "a": [1, 2, np.nan, np.nan, np.nan, np.nan],
+            "b": [1.01, 2.02, 3.03, 4.04, 5.05, 6.06],
+            "c": [np.nan, np.nan, 3, 5, 2, 8],
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = pearson_correlation(df, config, limit=0.9)
+
+    assert "`a` <-> `c`" in result
+    assert "| a <-> b | 1.000       | a" in result
