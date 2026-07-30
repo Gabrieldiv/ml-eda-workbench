@@ -5,7 +5,12 @@ import os
 import pandas as pd
 import pytest
 
-from eda_workbench.io import get_dataset_config, load_config, load_dataset, save_txt
+from eda_workbench.io import (
+    get_dataset_config,
+    load_config,
+    load_dataset,
+    save_markdown,
+)
 
 
 def test_load_dataset_valid_csv(tmp_path):
@@ -74,10 +79,10 @@ def test_load_config_returns_empty_when_no_candidate_exists(tmp_path, monkeypatc
     assert load_config() == {}
 
 
-def test_save_txt(tmp_path):
-    """Saves report content to a TXT file with correct name."""
-    path = save_txt("hello", "data/wine.csv", output_dir=str(tmp_path))
+def test_save_markdown(tmp_path):
+    """Saves report content to a markdown file with correct name."""
+    path = save_markdown("hello", "data/wine.csv", output_dir=str(tmp_path))
     assert os.path.exists(path)
-    assert "wine_report.txt" in path
+    assert "wine_report.md" in path
     with open(path) as f:
         assert f.read() == "hello"

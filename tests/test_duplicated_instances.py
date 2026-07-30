@@ -1,13 +1,16 @@
+"""Unit tests for duplicated_instances."""
+
 import pandas as pd
 
 from eda_workbench.analysis import duplicated_instances
 
+
 def test_duplicated_instances_none():
-    """Returns 'None' when every instance is unique."""
+    """Returns a 'none found' message when every instance is unique."""
     df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
     config = {"id_column": None, "target_column": None}
     result = duplicated_instances(df, config)
-    assert "None" in result
+    assert "**No duplicated instances found**" in result
 
 
 def test_duplicated_instances_one_group():
@@ -22,15 +25,15 @@ def test_duplicated_instances_one_group():
     )
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/row index: 1, 2" in result
+    assert "1, 2" in result
 
 
 def test_duplicated_instances_uses_row_index_without_id():
-    """Falls back to row position when there is no ID column."""
+    """Falls back to row index when there is no ID column."""
     df = pd.DataFrame({"a": [10, 10], "b": [20, 20]})
     config = {"id_column": None, "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/row index: 0, 1" in result
+    assert "0, 1" in result
 
 
 def test_duplicated_instances_multiple_groups():
@@ -44,8 +47,8 @@ def test_duplicated_instances_multiple_groups():
     )
     config = {"id_column": "id", "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/row index: 1, 2" in result
-    assert "2 instances - IDs/row index: 4, 5" in result
+    assert "1, 2" in result
+    assert "4, 5" in result
 
 
 def test_duplicated_instances_same_features_different_targets():
@@ -59,16 +62,16 @@ def test_duplicated_instances_same_features_different_targets():
     )
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/row index: 1, 2" in result
-    assert "2 instances - different targets: 0, 1" in result
+    assert "1, 2" in result
+    assert "0, 1" in result
 
 
 def test_duplicated_instances_empty_dataframe():
-    """Returns 'None' when the DataFrame has no rows."""
+    """Returns a 'none found' message when the DataFrame has no rows."""
     df = pd.DataFrame({"a": [], "b": []})
     config = {"id_column": None, "target_column": None}
     result = duplicated_instances(df, config)
-    assert "None" in result
+    assert "**No duplicated instances found**" in result
 
 
 def test_duplicated_instances_nan_values_match():
@@ -82,7 +85,7 @@ def test_duplicated_instances_nan_values_match():
     )
     config = {"id_column": "id", "target_column": None}
     result = duplicated_instances(df, config)
-    assert "2 instances - IDs/row index: 1, 2" in result
+    assert "1, 2" in result
 
 
 def test_duplicated_instances_same_target_no_conflict_flag():
@@ -96,4 +99,5 @@ def test_duplicated_instances_same_target_no_conflict_flag():
     )
     config = {"id_column": "id", "target_column": "target"}
     result = duplicated_instances(df, config)
-    assert "different targets" not in result
+    assert "1, 2" in result
+    assert "0, 0" not in result
