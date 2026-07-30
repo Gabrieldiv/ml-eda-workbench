@@ -78,26 +78,26 @@ def load_dataset(csv_path: str, config: dict) -> pd.DataFrame:
     return pd.read_csv(csv_path, sep=config["separator"], encoding=config["encoding"])
 
 
-def save_txt(content: str, csv_path: str, output_dir: str = "output") -> str:
-    """Save report content to a TXT file.
+def save_markdown(content: str, csv_path: str, output_dir: str = "output") -> str:
+    """Save report content to a Markdown file.
 
     The file name is based on the input CSV name.
-    Example: "data/wine.csv" generates "output/wine_report.txt".
+    Example: "data/wine.csv" generates "output/wine_report.md".
 
     Args:
-        content: Report text to save.
+        content: Report Markdown content to save.
         csv_path: Path to the source CSV, used to name the report.
         output_dir: Directory where the file will be saved. Default: "output".
 
     Returns:
-        Full path of the generated TXT file.
+        Full path of the generated Markdown file.
     """
     os.makedirs(output_dir, exist_ok=True)
 
     file_name = os.path.basename(csv_path)
     base_name, _ = os.path.splitext(file_name)
 
-    path = os.path.join(output_dir, f"{base_name}_report.txt")
+    path = os.path.join(output_dir, f"{base_name}_report.md")
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
