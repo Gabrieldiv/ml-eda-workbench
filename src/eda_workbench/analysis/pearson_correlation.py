@@ -19,14 +19,14 @@ def pearson_correlation(df: pd.DataFrame, config: dict, limit: float) -> str:
             characteristics are considered redundant.
 
     Returns:
-        Formatted string listing each redundant pair, their correlation,
-        and which characteristics are suggested for removal. Also lists any
-        non-numeric characteristics that were skipped.
+        Markdown-formatted string with a table of redundant characteristic
+        pairs, their correlation, and which one is suggested for removal.
+        Also lists skipped non-numeric characteristics and pairs whose
+        correlation could not be computed.
     """
-
     id_column = config.get("id_column")
     target_column = config.get("target_column")
-    lines = ["Pearson correlation for every characteristic:"]
+    lines = ["## Pearson Correlation"]
 
     exclude = {col for col in [id_column, target_column] if col is not None}
     df_feat = df.drop(columns=list(exclude), errors="ignore")
@@ -35,51 +35,74 @@ def pearson_correlation(df: pd.DataFrame, config: dict, limit: float) -> str:
     skipped_columns = list(df_feat.select_dtypes(exclude="number").columns)
 
     if skipped_columns:
-        lines.append("Skipped non-numeric characteristics:")
-        lines.append("\n".join(skipped_columns))
+        lines.append(
+            f"- **Skipped non-numeric characteristics**: {', '.join(skipped_columns)}"
+        )
 
-    if numeric_columns:
-        df_numeric = df_feat[numeric_columns]
-        correlation_matrix = df_numeric.corr()
-        labeled_matrix = correlation_matrix.fillna("NOT_COMPUTABLE")
-        mask = np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
-        correlation_pairs_raw = labeled_matrix.where(mask).stack().dropna()  # noqa: PD013
+    if not numeric_columns:
+        lines.append("- **No numeric characteristics found**")
+        return "\n".join(lines)
 
-        sentinel = correlation_pairs_raw == "NOT_COMPUTABLE"
-        nan_pairs = correlation_pairs_raw[sentinel]
+    df_numeric = df_feat[numeric_columns]
+    correlation_matrix = df_numeric.corr()
+    labeled_matrix = correlation_matrix.fillna("NOT_COMPUTABLE")
+    mask = np.triu(np.ones(correlation_matrix.shape), k=1).astype(bool)
+    correlation_pairs_raw = labeled_matrix.where(mask).stack().dropna()  # noqa: PD013
 
-        correlation_pairs = correlation_pairs_raw[~sentinel].astype(float)
-        redundant_pairs = correlation_pairs[correlation_pairs.abs() >= limit]
+    sentinel = correlation_pairs_raw == "NOT_COMPUTABLE"
+    nan_pairs = correlation_pairs_raw[sentinel]
 
-        if nan_pairs.empty and redundant_pairs.empty:
-            lines.append(
-                f"All characteristics correlations below the defined limit: {limit} "
+    correlation_pairs = correlation_pairs_raw[~sentinel].astype(float)
+    redundant_pairs = correlation_pairs[correlation_pairs.abs() >= limit]
+
+    if nan_pairs.empty and redundant_pairs.empty:
+        lines.append(f"- **All correlations below the defined limit ({limit})**")
+        return "\n".join(lines)
+
+    if not nan_pairs.empty:
+        if len(lines) > 1:
+            lines.append("")
+
+        lines.append("**Could not compute correlation (not enough variation/data):**")
+        lines.append("")
+        for column_a, column_b in nan_pairs.index:
+            lines.append(f"- `{column_a}` <-> `{column_b}`")
+
+    if not redundant_pairs.empty:
+        n_columns = len(correlation_matrix)
+        mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_columns - 1)
+
+        rows = []
+        for (column_a, column_b), corr_value in redundant_pairs.items():
+            if mean_abs_corr[column_a] >= mean_abs_corr[column_b]:
+                suggested_drop = column_a
+            else:
+                suggested_drop = column_b
+
+            rows.append(
+                (f"{column_a} <-> {column_b}", f"{corr_value:.3f}", suggested_drop)
             )
 
-        else:
-            if not nan_pairs.empty:
-                lines.append(
-                    "Could not compute correlation (not enough variation/data):"
-                )
-                for column_a, column_b in nan_pairs.index:
-                    lines.append(f"{column_a} <-> {column_b}")
+        headers = ("Pair", "Correlation", "Suggested Drop")
+        col1_width = max(len(headers[0]), max(len(r[0]) for r in rows))
+        col2_width = max(len(headers[1]), max(len(r[1]) for r in rows))
+        col3_width = max(len(headers[2]), max(len(r[2]) for r in rows))
 
-            if not redundant_pairs.empty:
-                n_columns = len(correlation_matrix)
-                mean_abs_corr = (correlation_matrix.abs().sum() - 1) / (n_columns - 1)
+        if len(lines) > 1:
+            lines.append("")
 
-                for (column_a, column_b), corr_value in redundant_pairs.items():
-                    if mean_abs_corr[column_a] >= mean_abs_corr[column_b]:
-                        suggested_drop = column_a
-                    else:
-                        suggested_drop = column_b
-
-                    lines.append(
-                        f"{column_a} <-> {column_b}: {corr_value:.3f} "
-                        f"(suggest dropping: {suggested_drop})"
-                    )
-
-    else:
-        lines.append("Numeric characteristics not found.")
+        lines.append(
+            f"| {headers[0]:<{col1_width}} | {headers[1]:<{col2_width}} | "
+            f"{headers[2]:<{col3_width}} |"
+        )
+        lines.append(
+            f"|{'-' * (col1_width + 2)}|{'-' * (col2_width + 2)}|"
+            f"{'-' * (col3_width + 2)}|"
+        )
+        for pair, corr_text, drop in rows:
+            lines.append(
+                f"| {pair:<{col1_width}} | {corr_text:<{col2_width}} | "
+                f"{drop:<{col3_width}} |"
+            )
 
     return "\n".join(lines)
