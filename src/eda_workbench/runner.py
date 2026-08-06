@@ -6,9 +6,9 @@ from eda_workbench.analysis import (
     basic_info,
     duplicated_instances,
     missing_values,
+    outliers_instances,
     pearson_correlation,
     zero_values,
-    outliers_instances
 )
 from eda_workbench.io import (
     get_dataset_config,

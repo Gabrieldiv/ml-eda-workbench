@@ -42,7 +42,7 @@ correlation:
   drop_threshold: 0.9
 
 outliers:
-  # Boxplot whisker multiplier — how many IQRs beyond Q1/Q3 count as an
+  # Boxplot outlier factor — how many IQRs beyond Q1/Q3 count as an
   # outlier. The conventional value is 1.5.
   outlier_factor: 1.5
 

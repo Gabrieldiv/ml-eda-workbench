@@ -133,3 +133,19 @@ def test_ignores_id_and_target_columns():
     assert "| id" not in result
     assert "| target" not in result
     assert "| a" in result
+
+
+def test_truncates_long_outlier_lists():
+    """Truncates the outlier list to the first 10 entries when there are more,
+    while keeping the total count accurate."""
+    df = pd.DataFrame(
+        {
+            "id": range(100),
+            "a": [0] * 80 + [1] * 5 + list(range(50, 65)),
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = outliers_instances(df, config, 1.5)
+    assert "20" in result
+    assert "... and 10 more" in result
+    assert result.count(":") <= 12  # ~10 outlier entries + header colon slack

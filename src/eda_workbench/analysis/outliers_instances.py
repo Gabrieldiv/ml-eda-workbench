@@ -100,10 +100,22 @@ def outliers_instances(
             else:
                 ids = outlier_series.index.astype(str)
 
-            outlier_text = ", ".join(
+            outlier_items = [
                 f"{label}: {value:.2f}"
                 for label, value in zip(ids, outlier_series, strict=True)
-            )
+            ]
+
+            max_displayed_outliers = 10
+
+            if len(outlier_items) > max_displayed_outliers:
+                remaining = len(outlier_items) - max_displayed_outliers
+                outlier_text = (
+                    ", ".join(outlier_items[:max_displayed_outliers])
+                    + f", ... and {remaining} more"
+                )
+
+            else:
+                outlier_text = ", ".join(outlier_items)
 
         rows.append(
             (
