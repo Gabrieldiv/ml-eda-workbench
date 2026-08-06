@@ -8,6 +8,7 @@ from eda_workbench.analysis import (
     missing_values,
     pearson_correlation,
     zero_values,
+    outliers_instances
 )
 from eda_workbench.io import (
     get_dataset_config,
@@ -56,6 +57,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
 
     config = load_config()
     limit = config.get("correlation", {}).get("drop_threshold", 0.9)
+    whisker_multiplier = config.get("outliers", {}).get("outlier_factor", 1.5)
 
     for csv_path in csv_files:
         print(f"\nProcessing: {csv_path}")
@@ -76,6 +78,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
         report += f"\n\n{pearson_correlation(df, dataset_config, limit)}"
+        report += f"\n\n{outliers_instances(df, dataset_config, whisker_multiplier)}"
 
         print(report)
 

@@ -41,6 +41,11 @@ correlation:
   # for removal and reduce dimensionality.
   drop_threshold: 0.9
 
+outliers:
+  # Boxplot whisker multiplier — how many IQRs beyond Q1/Q3 count as an
+  # outlier. The conventional value is 1.5.
+  outlier_factor: 1.5
+
 plots:
   # Default figure size in inches [width, height]
   figure_size: [12, 6]
