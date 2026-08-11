@@ -41,10 +41,12 @@ correlation:
   # for removal and reduce dimensionality.
   drop_threshold: 0.9
 
+
 outliers:
   # Boxplot outlier factor — how many IQRs beyond Q1/Q3 count as an
   # outlier. The conventional value is 1.5.
   outlier_factor: 1.5
+
 
 plots:
   # Default figure size in inches [width, height]
@@ -55,6 +57,7 @@ plots:
   dpi: 150
   # Directory where figures are saved by helper utilities
   save_dir: "outputs/figures/"
+
 
 profiling:
   # Set to true for a faster (less detailed) ydata-profiling report

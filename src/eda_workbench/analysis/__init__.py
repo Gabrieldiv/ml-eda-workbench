@@ -15,10 +15,10 @@ from eda_workbench.analysis.zero_values import zero_values
 
 __all__ = [
     "basic_info",
+    "characteristics_plot",
     "duplicated_instances",
     "missing_values",
+    "outliers_instances",
     "pearson_correlation",
     "zero_values",
-    "outliers_instances",
-    "characteristics_plot",
 ]
