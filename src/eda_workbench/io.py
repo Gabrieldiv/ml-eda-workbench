@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from matplotlib.figure import Figure
 
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "settings.yaml"
 
@@ -101,5 +102,31 @@ def save_markdown(content: str, csv_path: str, output_dir: str = "output") -> st
 
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
+
+    return path
+
+
+def save_plot(figure: Figure, csv_path: str, output_dir: str = "output") -> str:
+    """Save a matplotlib figure to a PNG file.
+
+    The file name is based on the input CSV name.
+    Example: "data/wine.csv" generates "output/wine_characteristics.png".
+
+    Args:
+        figure: Matplotlib Figure to save.
+        csv_path: Path to the source CSV, used to name the file.
+        output_dir: Directory where the file will be saved. Default: "output".
+
+    Returns:
+        Full path of the generated PNG file.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    file_name = os.path.basename(csv_path)
+    base_name, _ = os.path.splitext(file_name)
+
+    path = os.path.join(output_dir, f"{base_name}_characteristics.png")
+
+    figure.savefig(path, dpi=150, bbox_inches="tight")
 
     return path

@@ -6,6 +6,7 @@ functions so they remain importable as ``eda_workbench.analysis.<name>``.
 """
 
 from eda_workbench.analysis.basic_info import basic_info
+from eda_workbench.analysis.characteristics_plot import characteristics_plot
 from eda_workbench.analysis.duplicated_instances import duplicated_instances
 from eda_workbench.analysis.missing_values import missing_values
 from eda_workbench.analysis.outliers_instances import outliers_instances
@@ -19,4 +20,5 @@ __all__ = [
     "pearson_correlation",
     "zero_values",
     "outliers_instances",
+    "characteristics_plot",
 ]

@@ -4,6 +4,7 @@ import os
 
 from eda_workbench.analysis import (
     basic_info,
+    characteristics_plot,
     duplicated_instances,
     missing_values,
     outliers_instances,
@@ -15,6 +16,7 @@ from eda_workbench.io import (
     load_config,
     load_dataset,
     save_markdown,
+    save_plot,
 )
 
 # -----------------------------------------------------------------------------
@@ -69,7 +71,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         df = load_dataset(csv_path, dataset_config)
 
         report = f"# EDA Report — {base_name}\n\n"
-        report += basic_info(df, dataset_config["id_column"])
+        report += basic_info(df, dataset_config)
         report += "\n\n## Missing Values\n"
         report += (
             f"- **Instances with missing values**: {missing_values(df)} "
@@ -79,6 +81,13 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
         report += f"\n\n{pearson_correlation(df, dataset_config, limit)}"
         report += f"\n\n{outliers_instances(df, dataset_config, whisker_multiplier)}"
+
+        plot_text, figure = characteristics_plot(df, dataset_config)
+        report += f"\n\n{plot_text}"
+        if figure is not None:
+            image_path = save_plot(figure, csv_path, output_dir=output_dir)
+            image_name = os.path.basename(image_path)
+            report += f"\n\n![Characteristics Value Ranges]({image_name})"
 
         print(report)
 
