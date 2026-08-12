@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import yaml
 from matplotlib.figure import Figure
@@ -107,7 +108,7 @@ def save_markdown(content: str, csv_path: str, output_dir: str = "output") -> st
 
 
 def save_plot(figure: Figure, csv_path: str, output_dir: str = "output") -> str:
-    """Save a matplotlib figure to a PNG file.
+    """Save a matplotlib figure to a PNG file, then close it to free memory.
 
     The file name is based on the input CSV name.
     Example: "data/wine.csv" generates "output/wine_characteristics.png".
@@ -128,5 +129,6 @@ def save_plot(figure: Figure, csv_path: str, output_dir: str = "output") -> str:
     path = os.path.join(output_dir, f"{base_name}_characteristics.png")
 
     figure.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(figure)
 
     return path
