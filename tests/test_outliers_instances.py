@@ -140,12 +140,44 @@ def test_truncates_long_outlier_lists():
     while keeping the total count accurate."""
     df = pd.DataFrame(
         {
-            "id": range(100),
-            "a": [0] * 80 + [1] * 5 + list(range(50, 65)),
+            "id": range(115),
+            "a": list(range(1, 11)) * 10 + list(range(1000, 1015)),
         }
     )
     config = {"id_column": "id", "target_column": None}
     result = outliers_instances(df, config, 1.5)
-    assert "20" in result
-    assert "... and 10 more" in result
-    assert result.count(":") <= 12  # ~10 outlier entries + header colon slack
+    assert "15" in result
+    assert "... and 5 more" in result
+
+
+def test_zero_iqr_reports_frequency_distribution_instead_of_outliers():
+    """When IQR is zero, reports value frequency distribution instead of
+    treating every non-mode value as an outlier."""
+    df = pd.DataFrame(
+        {
+            "id": range(100),
+            "a": [0] * 80 + [1] * 15 + [2] * 5,
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = outliers_instances(df, config, 1.5)
+    assert "N/A (zero IQR)" in result
+    assert "0: 80 (80.0%)" in result
+    assert "1: 15 (15.0%)" in result
+    assert "2: 5 (5.0%)" in result
+
+
+def test_zero_iqr_frequency_distribution_truncated_when_many_distinct_values():
+    """Truncates the frequency distribution list when a zero-IQR characteristic
+    has more than 10 distinct values, while keeping the format consistent."""
+    df = pd.DataFrame(
+        {
+            "id": range(100),
+            "a": [0] * 80 + list(range(1, 21)),
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = outliers_instances(df, config, 1.5)
+    assert "N/A (zero IQR)" in result
+    assert "0: 80 (80.0%)" in result
+    assert "... and 11 more" in result

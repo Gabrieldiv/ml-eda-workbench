@@ -11,6 +11,12 @@ def outliers_instances(
     outside the boxplot whisker range: Q1 - whisker_multiplier * IQR to
     Q3 + whisker_multiplier * IQR, where IQR = Q3 - Q1.
 
+    When IQR is zero (a single value dominates at least 75% of the data,
+    collapsing the whisker range to a single point), the conventional
+    outlier rule would flag nearly every other value as an outlier, which
+    is statistically misleading. In that case, reports a value frequency
+    distribution instead of a flagged outlier count.
+
     Args:
         df: DataFrame with the dataset data.
         config: Dictionary with dataset settings (id_column, target_column).
@@ -60,6 +66,7 @@ def outliers_instances(
 
     empty_columns = []
     rows = []
+    max_displayed_items = 10
 
     for column in numeric_columns:
         series = df_feat[column]
@@ -76,46 +83,65 @@ def outliers_instances(
         maximum = stats["max"]
 
         iqr = q3 - q1
-        lower_bound = q1 - whisker_multiplier * iqr
-        upper_bound = q3 + whisker_multiplier * iqr
 
-        outlier_mask = (series < lower_bound) | (series > upper_bound)
-        outlier_series = series[outlier_mask]
-
-        if outlier_series.empty:
-            outlier_count = "0"
-            outlier_text = "—"
-        else:
-            outlier_count = str(len(outlier_series))
-
-            if id_column and id_column in df.columns:
-                id_values = df.loc[outlier_series.index, id_column]
-                ids = [
-                    f"{row_index} (missing ID)" if pd.isna(id_value) else str(id_value)
-                    for row_index, id_value in zip(
-                        outlier_series.index, id_values, strict=True
-                    )
-                ]
-
-            else:
-                ids = outlier_series.index.astype(str)
-
-            outlier_items = [
-                f"{label}: {value:.2f}"
-                for label, value in zip(ids, outlier_series, strict=True)
+        if iqr == 0:
+            value_counts = series.dropna().value_counts()
+            total_valid = value_counts.sum()
+            freq_items = [
+                f"{value}: {count} ({100 * count / total_valid:.1f}%)"
+                for value, count in value_counts.items()
             ]
 
-            max_displayed_outliers = 10
-
-            if len(outlier_items) > max_displayed_outliers:
-                remaining = len(outlier_items) - max_displayed_outliers
+            if len(freq_items) > max_displayed_items:
+                remaining = len(freq_items) - max_displayed_items
                 outlier_text = (
-                    ", ".join(outlier_items[:max_displayed_outliers])
+                    ", ".join(freq_items[:max_displayed_items])
                     + f", ... and {remaining} more"
                 )
-
             else:
-                outlier_text = ", ".join(outlier_items)
+                outlier_text = ", ".join(freq_items)
+
+            outlier_count = "N/A (zero IQR)"
+
+        else:
+            lower_bound = q1 - whisker_multiplier * iqr
+            upper_bound = q3 + whisker_multiplier * iqr
+
+            outlier_mask = (series < lower_bound) | (series > upper_bound)
+            outlier_series = series[outlier_mask]
+
+            if outlier_series.empty:
+                outlier_count = "0"
+                outlier_text = "—"
+            else:
+                outlier_count = str(len(outlier_series))
+
+                if id_column and id_column in df.columns:
+                    id_values = df.loc[outlier_series.index, id_column]
+                    ids = [
+                        f"{row_index} (missing ID)"
+                        if pd.isna(id_value)
+                        else str(id_value)
+                        for row_index, id_value in zip(
+                            outlier_series.index, id_values, strict=True
+                        )
+                    ]
+                else:
+                    ids = outlier_series.index.astype(str)
+
+                outlier_items = [
+                    f"{label}: {value:.2f}"
+                    for label, value in zip(ids, outlier_series, strict=True)
+                ]
+
+                if len(outlier_items) > max_displayed_items:
+                    remaining = len(outlier_items) - max_displayed_items
+                    outlier_text = (
+                        ", ".join(outlier_items[:max_displayed_items])
+                        + f", ... and {remaining} more"
+                    )
+                else:
+                    outlier_text = ", ".join(outlier_items)
 
         rows.append(
             (
