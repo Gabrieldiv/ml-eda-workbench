@@ -111,12 +111,13 @@ def test_missing_id_shows_placeholder_not_nan():
 
 
 def test_single_valid_value_in_column():
-    """Computes stats without crashing when only one value is valid."""
+    """A single valid value has zero IQR, so it's reported as a frequency
+    distribution instead of a conventional outlier count."""
     df = pd.DataFrame({"a": [np.nan, np.nan, 42, np.nan]})
     config = {"id_column": None, "target_column": None}
     result = outliers_instances(df, config, 1.5)
     assert "42.00" in result
-    assert "0" in result
+    assert "N/A (zero IQR)" in result
 
 
 def test_ignores_id_and_target_columns():
@@ -136,7 +137,7 @@ def test_ignores_id_and_target_columns():
 
 
 def test_truncates_long_outlier_lists():
-    """Truncates the outlier list to the first 10 entries when there are more,
+    """Truncates the outlier list to the first 8 entries when there are more,
     while keeping the total count accurate."""
     df = pd.DataFrame(
         {
@@ -147,7 +148,7 @@ def test_truncates_long_outlier_lists():
     config = {"id_column": "id", "target_column": None}
     result = outliers_instances(df, config, 1.5)
     assert "15" in result
-    assert "... and 5 more" in result
+    assert "... and 7 more" in result
 
 
 def test_zero_iqr_reports_frequency_distribution_instead_of_outliers():
@@ -169,7 +170,7 @@ def test_zero_iqr_reports_frequency_distribution_instead_of_outliers():
 
 def test_zero_iqr_frequency_distribution_truncated_when_many_distinct_values():
     """Truncates the frequency distribution list when a zero-IQR characteristic
-    has more than 10 distinct values, while keeping the format consistent."""
+    has more than 8 distinct values, while keeping the format consistent."""
     df = pd.DataFrame(
         {
             "id": range(100),
@@ -180,4 +181,22 @@ def test_zero_iqr_frequency_distribution_truncated_when_many_distinct_values():
     result = outliers_instances(df, config, 1.5)
     assert "N/A (zero IQR)" in result
     assert "0: 80 (80.0%)" in result
-    assert "... and 11 more" in result
+    assert "... and 13 more" in result
+
+
+def test_blank_line_separates_skipped_columns_from_table():
+    """Adds a blank line between the skipped-columns note and the table
+    when both are present, so the table renders correctly."""
+    df = pd.DataFrame(
+        {
+            "id": range(11),
+            "nome": ["Ana"] * 11,
+            "a": list(range(1, 11)) + [100],
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    result = outliers_instances(df, config, 1.5)
+
+    assert "**Skipped non-numeric characteristics**" in result
+    assert "| Characteristic" in result
+    assert "**Skipped non-numeric characteristics**: nome\n\n| Characteristic" in result

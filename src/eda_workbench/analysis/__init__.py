@@ -5,6 +5,7 @@ navigation as the analysis suite grows. This file re-exports the public
 functions so they remain importable as ``eda_workbench.analysis.<name>``.
 """
 
+from eda_workbench.analysis.analysis_provenance import analysis_provenance
 from eda_workbench.analysis.basic_info import basic_info
 from eda_workbench.analysis.characteristics_plot import characteristics_plot
 from eda_workbench.analysis.duplicated_instances import duplicated_instances
@@ -21,4 +22,5 @@ __all__ = [
     "outliers_instances",
     "pearson_correlation",
     "zero_values",
+    "analysis_provenance",
 ]

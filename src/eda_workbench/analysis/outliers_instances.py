@@ -2,33 +2,11 @@ import pandas as pd
 
 
 def outliers_instances(
-    df: pd.DataFrame, config: dict, whisker_multiplier: float
+    df: pd.DataFrame,
+    config: dict,
+    whisker_multiplier: float,
+    low_cardinality_threshold: int = 10,
 ) -> str:
-    """Report boxplot summary statistics and outliers for each characteristic.
-
-    For each numeric characteristic, computes the five-number summary
-    (min, Q1, median, Q3, max) and flags instances whose value falls
-    outside the boxplot whisker range: Q1 - whisker_multiplier * IQR to
-    Q3 + whisker_multiplier * IQR, where IQR = Q3 - Q1.
-
-    When IQR is zero (a single value dominates at least 75% of the data,
-    collapsing the whisker range to a single point), the conventional
-    outlier rule would flag nearly every other value as an outlier, which
-    is statistically misleading. In that case, reports a value frequency
-    distribution instead of a flagged outlier count.
-
-    Args:
-        df: DataFrame with the dataset data.
-        config: Dictionary with dataset settings (id_column, target_column).
-        whisker_multiplier: How many IQRs beyond Q1/Q3 define the whisker
-            range. The conventional boxplot value is 1.5.
-
-    Returns:
-        Markdown-formatted string with a table of summary statistics and
-        outlier instances (identified by ID when available, otherwise by
-        row index) per numeric characteristic. Lists skipped non-numeric
-        characteristics and characteristics with no valid data separately.
-    """
     id_column = config.get("id_column")
     target_column = config.get("target_column")
     lines = ["## Characteristic Outliers"]
@@ -65,8 +43,9 @@ def outliers_instances(
         return "\n".join(lines)
 
     empty_columns = []
+    low_cardinality_columns = []
     rows = []
-    max_displayed_items = 10
+    max_displayed_items = 8
 
     for column in numeric_columns:
         series = df_feat[column]
@@ -74,6 +53,11 @@ def outliers_instances(
         if series.isna().all():
             empty_columns.append(column)
             continue
+
+        valid_count = int(series.notna().sum())
+        nunique = series.nunique()
+        if nunique <= low_cardinality_threshold:
+            low_cardinality_columns.append(f"{column} ({nunique} distinct values)")
 
         stats = series.describe()
         minimum = stats["min"]
@@ -111,10 +95,14 @@ def outliers_instances(
             outlier_series = series[outlier_mask]
 
             if outlier_series.empty:
-                outlier_count = "0"
+                outlier_count = f"0 out of {valid_count} (0.0%)"
                 outlier_text = "—"
             else:
-                outlier_count = str(len(outlier_series))
+                n_outliers = len(outlier_series)
+                outlier_pct = 100 * n_outliers / valid_count
+                outlier_count = (
+                    f"{n_outliers} out of {valid_count} ({outlier_pct:.1f}%)"
+                )
 
                 if id_column and id_column in df.columns:
                     id_values = df.loc[outlier_series.index, id_column]
@@ -156,6 +144,12 @@ def outliers_instances(
             )
         )
 
+    if low_cardinality_columns:
+        lines.append(
+            "- **Low-cardinality numeric characteristics** (may be categorical/ordinal "
+            f"codes, not continuous measures): {', '.join(low_cardinality_columns)}"
+        )
+
     if empty_columns:
         lines.append(
             f"- **Characteristics with no valid data**: {', '.join(empty_columns)}"
@@ -164,6 +158,9 @@ def outliers_instances(
     if not rows:
         lines.append("- **No numeric characteristics with valid data**")
         return "\n".join(lines)
+
+    if len(lines) > 1:
+        lines.append("")
 
     headers = (
         "Characteristic",

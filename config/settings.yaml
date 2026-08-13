@@ -40,7 +40,17 @@ correlation:
   # characteristics are considered redundant. Used to flag candidates
   # for removal and reduce dimensionality.
   drop_threshold: 0.9
+  # Minimum number of overlapping non-null rows required to trust a
+  # pairwise correlation. Pairs with fewer valid rows are reported as
+  # insufficient data instead of being evaluated against drop_threshold.
+  min_pairwise_n: 30
 
+data_types:
+  # Numeric characteristics with this many or fewer distinct values are
+  # flagged as potentially categorical/ordinal codes (binary flags, IDs,
+  # counts) rather than continuous measures, since IQR outlier detection
+  # and Pearson correlation may not be statistically meaningful for them.
+  low_cardinality_threshold: 10
 
 outliers:
   # Boxplot outlier factor — how many IQRs beyond Q1/Q3 count as an
