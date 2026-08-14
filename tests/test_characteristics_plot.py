@@ -68,3 +68,15 @@ def test_generates_valid_figure_for_normal_case():
     text, figure = characteristics_plot(df, config)
     assert isinstance(figure, Figure)
     assert len(figure.axes) == 1
+
+
+def test_constant_column_reported_separately():
+    """Reports a constant (zero-variance) column separately, since it cannot
+    be standardized, while still plotting the other characteristics."""
+    df = pd.DataFrame({"a": [5, 5, 5, 5], "b": [1, 2, 3, 100]})
+    config = {"id_column": None, "target_column": None}
+    text, figure = characteristics_plot(df, config)
+    assert (
+        "**Constant characteristics (no variability, cannot standardize)**: a" in text
+    )
+    assert figure is not None
