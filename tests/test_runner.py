@@ -40,3 +40,6 @@ def test_process_folder_generates_reports(tmp_path):
 
     content = reports[0].read_text(encoding="utf-8")
     assert "## Duplicated Instances" in content
+    assert "## Bias Identification" in content
+    assert "no protected attributes configured" in content
+    assert "sec:identification" not in content

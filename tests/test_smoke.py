@@ -129,6 +129,23 @@ def test_sklearn_train_test_split():
 
 
 # ---------------------------------------------------------------------------
+# Fairlearn / SHAP
+# ---------------------------------------------------------------------------
+
+
+def test_fairlearn_importable():
+    import fairlearn
+
+    assert hasattr(fairlearn, "__version__")
+
+
+def test_shap_importable():
+    import shap
+
+    assert hasattr(shap, "__version__")
+
+
+# ---------------------------------------------------------------------------
 # eda_workbench package
 # ---------------------------------------------------------------------------
 
