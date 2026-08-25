@@ -56,6 +56,7 @@ def _populated_result() -> BiasIdentificationResult:
                     attribute="sex",
                     group="f",
                     count=8,
+                    actual_positive_rate=0.6,
                     selection_rate=0.5,
                     true_positive_rate=0.6,
                     false_positive_rate=0.2,
@@ -67,6 +68,7 @@ def _populated_result() -> BiasIdentificationResult:
                     attribute="sex",
                     group="m",
                     count=2,
+                    actual_positive_rate=0.2,
                     selection_rate=0.1,
                     true_positive_rate=0.4,
                     false_positive_rate=0.1,
@@ -175,24 +177,32 @@ def test_skip_reasons_rendered_when_protected_attributes_missing():
 def test_render_populated_coverage_metrics_and_shap():
     result = _populated_result()
     markdown = render_bias_identification(result)
+    visible, _, breakdown = markdown.partition("<details>")
     assert ASSUMPTIONS_HEADING in markdown
     assert "### Findings" in markdown
     assert "underrepresentation flags" in markdown
-    assert "With respect to `sex`" in markdown
-    assert "feature `f1`" in markdown
-    assert "#### `sex`" in markdown
+    assert "`sex` outcomes" in markdown
+    assert "`f1` across `sex`" in markdown
+    assert "Eval n below 30" in markdown
+    assert "Positive class is the `1` label" in markdown
+    assert "Question:" not in visible
+    assert "With respect to" not in visible
+    assert "#### `sex`" in breakdown
     assert "sec:identification" not in markdown
     assert "_Paper:" not in markdown
     assert "Section 6.3" not in markdown
     assert "Underrepresented" in markdown
     assert "Intersectional sparsity" in markdown
-    assert "Selection rate" in markdown
-    assert "Mean |SHAP|" in markdown
+    assert "Actual +" in markdown
+    assert "Predicted +" in markdown
+    assert "Mean abs SHAP" in markdown
+    assert "Mean |SHAP|" not in markdown
     assert "Worst-group accuracy" in markdown
     assert "Where outcome metrics come from" in markdown
-    assert "Grouping columns" in markdown
-    assert "<details>" in markdown
+    assert "Grouped by" in markdown
     assert "Groups in table" in markdown
+    assert "f 80.0% (n=8)" in visible
+    assert "f 80.0%" not in visible.split("### Representational coverage")[0]
 
 
 def test_full_report_detail_expands_breakdown():
@@ -202,6 +212,33 @@ def test_full_report_detail_expands_breakdown():
     assert "### Fairness dashboard" in markdown
     assert "Where outcome metrics come from" in markdown
     assert "y_true" in markdown
+    assert "Question:" not in markdown
+
+
+def test_summary_does_not_repeat_outcome_rates_in_findings():
+    visible = render_bias_identification(_populated_result()).split("<details>")[0]
+    assert "50.0%" in visible
+    assert visible.split("### Model outcomes")[0].count("50.0%") == 0
+
+
+def test_shap_grouping_feature_is_marked_expected():
+    result = _populated_result()
+    result = BiasIdentificationResult(
+        coverage=result.coverage,
+        metrics=result.metrics,
+        shap=ShapAuditResult(
+            n_explained=8,
+            global_importance=(ShapFeatureImportance("sex", 0.2),),
+            by_group=(
+                ShapGroupMean("sex", "f", "sex", 0.3),
+                ShapGroupMean("sex", "m", "sex", -0.2),
+            ),
+            flags=("sex/sex: cross-group mean SHAP gap 0.500 exceeds 0.1",),
+        ),
+    )
+    markdown = render_bias_identification(result)
+    assert "expected when the grouping column is a model feature" in markdown
+    assert "`f1` across" not in markdown
 
 
 def test_summary_report_detail_is_the_default():

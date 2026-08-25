@@ -54,13 +54,15 @@ class CoverageResult:
 class GroupMetrics:
     """Fairlearn per-group metrics for one protected attribute value.
 
-    selection_rate: §5.1; TPR/FPR: §5.2; precision: §5.3; accuracy: §5.5;
-    roc_auc: §5.4 (optional, needs scores).
+    actual_positive_rate: label prevalence; selection_rate: §5.1;
+    TPR/FPR: §5.2; precision: §5.3; accuracy: §5.5; roc_auc: §5.4
+    (optional, needs scores).
     """
 
     attribute: str
     group: str
     count: int
+    actual_positive_rate: float | None = None
     selection_rate: float | None = None
     true_positive_rate: float | None = None
     false_positive_rate: float | None = None

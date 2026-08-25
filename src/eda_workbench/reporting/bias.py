@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from eda_workbench.bias.prepare import resolve_thresholds
 from eda_workbench.bias.types import (
+    AttributeMetricSummary,
     BiasIdentificationResult,
     CoverageResult,
     GroupMetrics,
@@ -66,9 +67,16 @@ def _code_join(names: list[str]) -> str:
     return ", ".join(f"`{name}`" for name in names)
 
 
+def _md_cell(value: str) -> str:
+    """Keep Markdown tables valid: pipes inside cells break column parsing."""
+    return value.replace("|", "/")
+
+
 def _md_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> list[str]:
     if not rows:
         return []
+    headers = tuple(_md_cell(header) for header in headers)
+    rows = [tuple(_md_cell(cell) for cell in row) for row in rows]
     widths = [len(header) for header in headers]
     for row in rows:
         for index, cell in enumerate(row):
@@ -132,15 +140,34 @@ def _minmax(
     )
 
 
+def _fmt_rate(value: float | None) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return "n/a"
+    return f"{value:.1%}"
+
+
 def _range_text(rows: list[GroupMetrics], field: str) -> str:
     pair = _minmax(rows, field)
     if pair is None:
         return "—"
     low, high = pair
+    fmt = _fmt_rate if field in _RATE_FIELDS else _fmt_float
     return (
-        f"{_fmt_float(getattr(low, field))} (`{low.group}`) – "
-        f"{_fmt_float(getattr(high, field))} (`{high.group}`)"
+        f"{fmt(getattr(low, field))} (`{low.group}`) – "
+        f"{fmt(getattr(high, field))} (`{high.group}`)"
     )
+
+
+_RATE_FIELDS = {
+    "actual_positive_rate",
+    "selection_rate",
+    "true_positive_rate",
+    "false_positive_rate",
+    "precision",
+    "accuracy",
+}
 
 
 def _shap_gaps(
@@ -170,208 +197,125 @@ def _shap_gaps(
     return gaps
 
 
+def _is_grouping_feature(attribute: str, feature: str) -> bool:
+    return attribute.strip().lower() == feature.strip().lower()
+
+
+def _small_eval_groups(groups: list[GroupMetrics], min_n: int) -> list[GroupMetrics]:
+    return [row for row in groups if row.count < min_n]
+
+
+def _flagged_check_names(
+    summary: AttributeMetricSummary, thresholds: dict
+) -> list[str]:
+    rate_thr = float(thresholds["rate_difference_threshold"])
+    di_thr = float(thresholds["disparate_impact_threshold"])
+    names: list[str] = []
+    if (
+        summary.demographic_parity_difference is not None
+        and abs(summary.demographic_parity_difference) > rate_thr
+    ):
+        names.append("predicted-positive rate")
+    if (
+        summary.demographic_parity_ratio is not None
+        and summary.demographic_parity_ratio < di_thr
+    ):
+        names.append("predicted-positive ratio")
+    if (
+        summary.equal_opportunity_difference is not None
+        and abs(summary.equal_opportunity_difference) > rate_thr
+    ):
+        names.append("TPR")
+    if (
+        summary.equalized_odds_difference is not None
+        and abs(summary.equalized_odds_difference) > rate_thr
+    ):
+        names.append("equalized odds")
+    if summary.accuracy_gap is not None and summary.accuracy_gap > rate_thr:
+        names.append("accuracy")
+    return names
+
+
 def _render_intro(
     result: BiasIdentificationResult,
     grouping_columns: list[str],
     target_column: str | None,
 ) -> list[str]:
-    lines = [
-        "This section flags **gaps across groups**. A flag means a configured "
-        "threshold was crossed for a **specific grouping column** — not a "
-        "verdict that the dataset or model “is biased” or “is fair”.",
-        "",
-    ]
     if grouping_columns:
-        lines.append(
-            f"**Grouping columns** (from `protected_attributes` in config): "
-            f"{_code_join(grouping_columns)}. These are ordinary columns in the "
-            "dataset. The workbench splits rows by the values found in those "
-            "columns; it does not infer what the names mean."
-        )
+        grouped = f"Grouped by {_code_join(grouping_columns)} (`protected_attributes`)."
     else:
-        lines.append(
+        grouped = (
             "No `protected_attributes` were configured, so there are no "
             "grouping columns to audit."
         )
-    if target_column and result.ran_metrics:
-        lines.extend(
-            [
-                "",
-                f"**Outcome** for eval metrics: `{target_column}` compared as "
-                "`y_true` vs `y_pred` in the predictions file (AUC uses "
-                "`y_score` when that column is present).",
-            ]
+    if result.ran_metrics:
+        outcome = f"`{target_column}`" if target_column else "`y_true`"
+        positive = (
+            f" Positive class is the `1` label on {outcome} (`y_true` / `y_pred`)."
         )
-    elif result.ran_metrics:
-        lines.extend(
-            [
-                "",
-                "**Outcome** for eval metrics: `y_true` vs `y_pred` in the "
-                "predictions file (AUC uses `y_score` when present).",
-            ]
-        )
-    return lines
+    else:
+        positive = ""
+    return [
+        f"{grouped}{positive} Flags are threshold crossings for a grouping "
+        "column — not a verdict that the dataset or model “is biased”.",
+    ]
 
 
 def _render_coverage_findings(coverage: CoverageResult, thresholds: dict) -> list[str]:
-    lines = [
-        "#### Table composition",
-        "",
-        "Question: how often does each group appear in the **profiled CSV**? "
-        "This is not model performance.",
-        "",
-    ]
     if coverage.skipped:
-        lines.append(f"- {coverage.skipped}")
-        return lines
+        return [f"- **Table:** {coverage.skipped}"]
 
     min_n = int(thresholds["min_group_count"])
     min_share = float(thresholds["min_group_share"])
-    for attribute in coverage.attributes:
-        parts = [
-            f"`{group.group}` {_fmt_share(group.share)} (n={group.count})"
-            for group in attribute.groups
+    under = [
+        f"`{group.attribute}`=`{group.group}` (n={group.count})"
+        for attribute in coverage.attributes
+        for group in attribute.groups
+        if group.underrepresented
+    ]
+    sparse_n = sum(1 for item in coverage.intersections if item.sparse)
+    if under:
+        extra = f"; {sparse_n} sparse intersection(s)" if sparse_n else ""
+        return [f"- **Table:** underrepresentation flags: {', '.join(under)}{extra}."]
+    if sparse_n:
+        return [
+            f"- **Table:** {sparse_n} intersectional combination(s) below the "
+            "share cutoff (see table)."
         ]
-        under = [group for group in attribute.groups if group.underrepresented]
-        if under:
-            listed = ", ".join(f"`{group.group}` (n={group.count})" for group in under)
-            status = f"underrepresentation flags: {listed}"
-        else:
-            status = f"No group is below n={min_n} or {_fmt_share(min_share)} share"
-        lines.append(
-            f"- **With respect to `{attribute.attribute}`:** {', '.join(parts)}. "
-            f"{status}."
-        )
-
-    sparse = [item for item in coverage.intersections if item.sparse]
-    if sparse:
-        lines.append(
-            f"- **Intersectional sparsity:** {len(sparse)} combination(s) of "
-            "the grouping columns fall below the configured share threshold."
-        )
-    lines.extend(_render_notes(coverage.notes))
-    return lines
+    return [
+        f"- **Table:** no underrepresentation flags "
+        f"(n<{min_n} or share<{_fmt_share(min_share)})."
+    ]
 
 
 def _render_metric_findings(
     result: BiasIdentificationResult, thresholds: dict
 ) -> list[str]:
-    lines = [
-        "#### Model outcomes",
-        "",
-        "Question: do predicted / actual labels differ across groups **on the "
-        "eval predictions file**? Precision, accuracy, AUC, and the rates "
-        "below are computed from `y_true` vs `y_pred` (AUC from `y_score`) "
-        "with fairlearn and sklearn. The workbench does not train a model "
-        "and does not score the profiled CSV.",
-        "",
-    ]
     metrics = result.metrics
     if not result.ran_metrics:
         reason = metrics.skipped or "no predictions table loaded."
-        lines.append(f"- Not computed ({reason})")
-        return lines
+        return [f"- **Outcomes:** not computed ({reason})"]
 
-    rate_thr = float(thresholds["rate_difference_threshold"])
-    di_thr = float(thresholds["disparate_impact_threshold"])
-    lines.append(
-        f"- **Eval rows:** {metrics.n_rows}"
-        f"{' (binary target)' if metrics.binary_target else ' (non-binary target)'}"
-    )
-
+    min_n = int(thresholds["min_group_count"])
+    lines: list[str] = []
     for summary in metrics.summaries:
         groups = _group_metrics(metrics, summary.attribute)
-        group_list = (
-            ", ".join(f"`{row.group}` n={row.count}" for row in groups) or "no groups"
-        )
-        bullets: list[str] = []
-        selection = _minmax(groups, "selection_rate")
-        if (
-            summary.demographic_parity_difference is not None
-            and abs(summary.demographic_parity_difference) > rate_thr
-        ):
-            if selection is not None:
-                low, high = selection
-                bullets.append(
-                    "positive-prediction rate (demographic parity) "
-                    f"{_fmt_float(high.selection_rate)} in `{high.group}` vs "
-                    f"{_fmt_float(low.selection_rate)} in `{low.group}` "
-                    f"(difference "
-                    f"{_fmt_float(summary.demographic_parity_difference)}; "
-                    f"threshold {rate_thr:g})"
-                )
-            else:
-                bullets.append(
-                    "demographic parity difference "
-                    f"{_fmt_float(summary.demographic_parity_difference)} "
-                    f"exceeds {rate_thr:g}"
-                )
-        if (
-            summary.demographic_parity_ratio is not None
-            and summary.demographic_parity_ratio < di_thr
-        ):
-            bullets.append(
-                "demographic-parity ratio "
-                f"{_fmt_float(summary.demographic_parity_ratio)} is below "
-                f"{di_thr:g}"
+        checks = _flagged_check_names(summary, thresholds)
+        small = _small_eval_groups(groups, min_n)
+        small_note = ""
+        if small:
+            listed = ", ".join(f"`{row.group}` (n={row.count})" for row in small)
+            small_note = f" Eval n below {min_n}: {listed}."
+        if checks:
+            listed = ", ".join(checks)
+            lines.append(
+                f"- **`{summary.attribute}` outcomes:** flagged ({listed}).{small_note}"
             )
-        tpr = _minmax(groups, "true_positive_rate")
-        if (
-            summary.equal_opportunity_difference is not None
-            and abs(summary.equal_opportunity_difference) > rate_thr
-        ):
-            if tpr is not None:
-                low, high = tpr
-                bullets.append(
-                    "true-positive rate among actual positives "
-                    "(equal opportunity) "
-                    f"{_fmt_float(high.true_positive_rate)} in `{high.group}` "
-                    f"vs {_fmt_float(low.true_positive_rate)} in `{low.group}` "
-                    f"(difference "
-                    f"{_fmt_float(summary.equal_opportunity_difference)}; "
-                    f"threshold {rate_thr:g})"
-                )
-            else:
-                bullets.append(
-                    "equal opportunity difference "
-                    f"{_fmt_float(summary.equal_opportunity_difference)} "
-                    f"exceeds {rate_thr:g}"
-                )
-        if (
-            summary.equalized_odds_difference is not None
-            and abs(summary.equalized_odds_difference) > rate_thr
-        ):
-            bullets.append(
-                "equalized odds (TPR and FPR together) difference "
-                f"{_fmt_float(summary.equalized_odds_difference)} exceeds "
-                f"{rate_thr:g}"
-            )
-        acc = _minmax(groups, "accuracy")
-        if summary.accuracy_gap is not None and summary.accuracy_gap > rate_thr:
-            if acc is not None:
-                low, high = acc
-                bullets.append(
-                    "accuracy "
-                    f"{_fmt_float(high.accuracy)} in `{high.group}` vs "
-                    f"{_fmt_float(low.accuracy)} in `{low.group}` "
-                    f"(gap {_fmt_float(summary.accuracy_gap)}; "
-                    f"threshold {rate_thr:g})"
-                )
-            else:
-                bullets.append(
-                    f"accuracy gap {_fmt_float(summary.accuracy_gap)} exceeds "
-                    f"{rate_thr:g}"
-                )
-        if bullets:
-            lines.append(f"- **With respect to `{summary.attribute}`** ({group_list}):")
-            lines.extend(f"  - {item}" for item in bullets)
         else:
             lines.append(
-                f"- **With respect to `{summary.attribute}`** ({group_list}): "
-                "no rate/ratio gaps above the configured thresholds. This is "
-                "not a proof of fairness."
+                f"- **`{summary.attribute}` outcomes:** no rate gaps above "
+                f"thresholds.{small_note} Not a proof of fairness."
             )
-
     lines.extend(_render_notes(metrics.notes))
     return lines
 
@@ -379,44 +323,39 @@ def _render_metric_findings(
 def _render_shap_findings(
     result: BiasIdentificationResult, thresholds: dict
 ) -> list[str]:
-    lines = [
-        "#### Feature attributions (SHAP)",
-        "",
-        "Question: does the **model's explanation** for a feature differ "
-        "across groups of a grouping column? This is not an outcome-fairness "
-        "test.",
-        "",
-    ]
     shap = result.shap
     if not result.ran_shap:
         reason = shap.skipped or "eval table or model was not loaded."
-        lines.append(f"- Not computed ({reason})")
-        return lines
+        return [f"- **SHAP:** not computed ({reason})"]
 
     gap_thr = float(thresholds["shap_attribution_gap_threshold"])
     flagged = [item for item in _shap_gaps(shap) if item[6] > gap_thr]
-    if flagged:
+
+    expected = [item for item in flagged if _is_grouping_feature(item[0], item[1])]
+    other = [item for item in flagged if not _is_grouping_feature(item[0], item[1])]
+    lines: list[str] = []
+    if other:
+        bits = [
+            f"`{feature}` across `{attribute}`" for attribute, feature, *_rest in other
+        ]
         lines.append(
-            f"- **Eval rows explained:** {shap.n_explained}. Mean SHAP gaps "
-            f"above {gap_thr:g}:"
+            f"- **SHAP:** attribution gaps above {gap_thr:g}: {', '.join(bits)}."
         )
-        for attribute, feature, low_g, high_g, low_v, high_v, gap in flagged:
+    if expected:
+        bits = [f"`{feature}`" for _attr, feature, *_rest in expected]
+        lines.append(
+            "- **SHAP:** "
+            + ", ".join(bits)
+            + " differ across their own groups (expected when the grouping "
+            "column is a model feature)."
+        )
+    if not flagged:
+        if shap.flags:
+            lines.extend(f"- **SHAP:** {flag}" for flag in shap.flags)
+        else:
             lines.append(
-                f"  - **With respect to `{attribute}`**, feature `{feature}`: "
-                f"{_fmt_float(high_v)} in `{high_g}` vs {_fmt_float(low_v)} in "
-                f"`{low_g}` (gap {_fmt_float(gap)})"
+                f"- **SHAP:** no cross-group mean SHAP gaps above {gap_thr:g}."
             )
-    elif shap.flags:
-        lines.append(
-            f"- **Eval rows explained:** {shap.n_explained}. Attribution gaps "
-            f"above {gap_thr:g}:"
-        )
-        lines.extend(f"  - {flag}" for flag in shap.flags)
-    else:
-        lines.append(
-            f"- **Eval rows explained:** {shap.n_explained}. No cross-group "
-            f"mean SHAP gaps above {gap_thr:g}."
-        )
     lines.extend(_render_notes(shap.notes))
     return lines
 
@@ -424,9 +363,7 @@ def _render_shap_findings(
 def _render_findings(result: BiasIdentificationResult, thresholds: dict) -> list[str]:
     lines = ["### Findings", ""]
     lines.extend(_render_coverage_findings(result.coverage, thresholds))
-    lines.append("")
     lines.extend(_render_metric_findings(result, thresholds))
-    lines.append("")
     lines.extend(_render_shap_findings(result, thresholds))
     return lines
 
@@ -435,8 +372,8 @@ def _render_coverage_compact(coverage: CoverageResult) -> list[str]:
     lines = [
         "### Representational coverage",
         "",
-        f"Profiled table: **{coverage.n_rows} rows**. Shares are how common "
-        "each group is in this table, not model quality.",
+        f"{coverage.n_rows} profiled rows. Shares are how common each group "
+        "is in this table, not model quality.",
         "",
     ]
     if coverage.skipped:
@@ -446,7 +383,8 @@ def _render_coverage_compact(coverage: CoverageResult) -> list[str]:
     rows = []
     for attribute in coverage.attributes:
         groups = ", ".join(
-            f"{group.group} {_fmt_share(group.share)}" for group in attribute.groups
+            f"{group.group} {_fmt_share(group.share)} (n={group.count})"
+            for group in attribute.groups
         )
         under = (
             ", ".join(
@@ -468,42 +406,39 @@ def _render_coverage_compact(coverage: CoverageResult) -> list[str]:
     sparse_n = sum(1 for item in coverage.intersections if item.sparse)
     if sparse_n:
         lines.append("")
-        lines.append(
-            f"- {sparse_n} intersectional combination(s) flagged as sparse "
-            "(see breakdown)."
-        )
+        lines.append(f"{sparse_n} sparse intersection(s) — see breakdown.")
     return lines
 
 
 def _render_metrics_compact(metrics: MetricAuditResult) -> list[str]:
     lines = [
-        "### Model outcomes (eval predictions)",
+        "### Model outcomes",
         "",
-        f"Eval prediction rows: **{metrics.n_rows}**. Gaps are max−min across "
-        "groups of each grouping column.",
+        f"{metrics.n_rows} eval rows. **Actual +** is label prevalence; "
+        "**Predicted +** is the model's positive rate. Compare the two to "
+        "see whether a prediction gap tracks the labels.",
         "",
     ]
     rows = []
     for summary in metrics.summaries:
         groups = _group_metrics(metrics, summary.attribute)
-        flag_count = len(summary.flags)
         rows.append(
             (
                 f"`{summary.attribute}`",
+                _range_text(groups, "actual_positive_rate"),
                 _range_text(groups, "selection_rate"),
                 _range_text(groups, "true_positive_rate"),
                 _range_text(groups, "accuracy"),
-                str(flag_count) if flag_count else "none",
             )
         )
     lines.extend(
         _md_table(
             (
                 "Grouped by",
-                "Positive-pred rate",
+                "Actual +",
+                "Predicted +",
                 "TPR",
                 "Accuracy",
-                "Flags",
             ),
             rows,
         )
@@ -515,14 +450,14 @@ def _render_shap_compact(shap: ShapAuditResult) -> list[str]:
     lines = [
         "### Feature attributions (SHAP)",
         "",
-        f"Eval rows explained: **{shap.n_explained}**. Higher mean |SHAP| "
-        "means the feature moved the model's output more on those rows.",
+        f"{shap.n_explained} eval rows explained. Higher mean abs SHAP means "
+        "the feature moved the model's output more.",
         "",
     ]
     top = shap.global_importance[:5]
     if top:
         rows = [(item.feature, _fmt_float(item.mean_abs_shap)) for item in top]
-        lines.extend(_md_table(("Feature", "Mean |SHAP|"), rows))
+        lines.extend(_md_table(("Feature", "Mean abs SHAP"), rows))
     return lines
 
 
@@ -596,11 +531,12 @@ def _render_metrics(metrics: MetricAuditResult) -> list[str]:
                 row.attribute,
                 row.group,
                 str(row.count),
-                _fmt_float(row.selection_rate),
-                _fmt_float(row.true_positive_rate),
-                _fmt_float(row.false_positive_rate),
-                _fmt_float(row.precision),
-                _fmt_float(row.accuracy),
+                _fmt_rate(row.actual_positive_rate),
+                _fmt_rate(row.selection_rate),
+                _fmt_rate(row.true_positive_rate),
+                _fmt_rate(row.false_positive_rate),
+                _fmt_rate(row.precision),
+                _fmt_rate(row.accuracy),
                 _fmt_float(row.roc_auc),
             )
             for row in metrics.by_group
@@ -611,7 +547,8 @@ def _render_metrics(metrics: MetricAuditResult) -> list[str]:
                     "Attribute",
                     "Group",
                     "n",
-                    "Selection rate",
+                    "Actual +",
+                    "Predicted +",
                     "TPR",
                     "FPR",
                     "Precision",
@@ -661,10 +598,10 @@ def _render_shap(result: ShapAuditResult) -> list[str]:
     lines.extend(_render_notes(result.notes))
 
     if result.global_importance:
-        lines.extend(["", "#### Mean |SHAP| (global)", ""])
+        lines.extend(["", "#### Mean abs SHAP (global)", ""])
         top = result.global_importance[:10]
         rows = [(item.feature, _fmt_float(item.mean_abs_shap)) for item in top]
-        lines.extend(_md_table(("Feature", "Mean |SHAP|"), rows))
+        lines.extend(_md_table(("Feature", "Mean abs SHAP"), rows))
 
     if result.by_group:
         lines.extend(["", "#### Mean SHAP by group", ""])
@@ -681,7 +618,14 @@ def _render_shap(result: ShapAuditResult) -> list[str]:
 
     if result.flags:
         lines.extend(["", "- **Flags**:"])
-        lines.extend(f"  - {flag}" for flag in result.flags)
+        for flag in result.flags:
+            prefix = flag.split(":", 1)[0]
+            note = ""
+            if "/" in prefix:
+                attribute, feature = prefix.split("/", 1)
+                if _is_grouping_feature(attribute, feature):
+                    note = " (expected: grouping column is a model feature)"
+            lines.append(f"  - {flag}{note}")
     return lines
 
 
@@ -700,7 +644,9 @@ def _render_glossary() -> list[str]:
         "",
         "| Name | Question | Source |",
         "|------|----------|--------|",
-        "| Selection rate | What share of this group got a positive `y_pred`? "
+        "| Actual + | What share of this group is actually positive "
+        "(`y_true`)? | fairlearn `selection_rate` on `y_true` |",
+        "| Predicted + | What share of this group got a positive `y_pred`? "
         "| fairlearn `selection_rate` |",
         "| TPR | Of actual positives, how many were predicted positive? "
         "| fairlearn `true_positive_rate` |",

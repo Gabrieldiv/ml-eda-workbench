@@ -46,6 +46,11 @@ from eda_workbench.bias.types import (
 _precision = partial(precision_score, zero_division=0)
 
 
+def actual_positive_rate(y_true, y_pred) -> float:
+    """Prevalence of the positive label in ``y_true`` (ignores ``y_pred``)."""
+    return float(selection_rate(y_true, y_true))
+
+
 def _optional_float(value: object) -> float | None:
     if value is None:
         return None
@@ -95,6 +100,7 @@ def _binary_metrics() -> dict:
     # independence §5.1, separation §5.2, sufficiency §5.3, aggregate §5.5.
     return {
         "count": count,
+        "actual_positive_rate": actual_positive_rate,
         "selection_rate": selection_rate,  # §5.1 independence (selection / DP)
         "true_positive_rate": true_positive_rate,  # §5.2 equal opportunity
         "false_positive_rate": false_positive_rate,  # §5.2 predictive equality
@@ -218,6 +224,9 @@ def audit_metrics(
                     attribute=attr,
                     group=str(group_value),
                     count=int(record.get("count", 0) or 0),
+                    actual_positive_rate=_optional_float(
+                        record.get("actual_positive_rate")
+                    ),
                     selection_rate=_optional_float(record.get("selection_rate")),
                     true_positive_rate=_optional_float(
                         record.get("true_positive_rate")

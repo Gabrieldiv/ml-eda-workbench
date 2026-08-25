@@ -139,24 +139,18 @@ section is skipped with an explicit note — the EDA run does not crash.
 ## What the report shows
 
 The Markdown report does **not** cite paper sections. Default
-`bias.report_detail: summary` keeps findings and compact tables visible and
-puts the rest in a collapsible `<details>` breakdown (GitHub / VS Code /
-Cursor preview). Set `report_detail: full` to expand every table.
+`bias.report_detail: summary` keeps a short Findings list and one compact
+table per block; the rest is in a collapsible `<details>` breakdown.
+Set `report_detail: full` to expand every table.
 
-- **Findings** — each flag is **with respect to a grouping column** (table
-  composition vs eval outcomes vs SHAP). A flag is a threshold crossing, not
-  a verdict that the system “is biased”.
-- **Assumptions** — when metrics or SHAP ran (in the breakdown for `summary`).
-- **Coverage** (profiled CSV) — compact group shares up front; per-group n /
-  share, imbalance, and sparse intersections in the breakdown.
-- **Fairness dashboard** (eval predictions only) —
-  independence (selection rate, demographic parity difference/ratio),
-  separation (TPR/FPR, equal opportunity / equalized odds difference),
-  sufficiency (precision/PPV), group-aggregate (per-group accuracy,
-  worst-group accuracy, accuracy gap). Binary metrics when the eval target
-  is binary; otherwise group-aggregate only.
-- **SHAP** (model + `eval_path` only) — top features by mean |SHAP|; mean
-  SHAP by group; flags for large cross-group attribution gaps.
-- **Where outcome metrics come from** — precision / accuracy / AUC are
-  computed from `predictions_path` (`y_true` vs `y_pred`; AUC from `y_score`)
-  with fairlearn and sklearn. They are not read from the profiled CSV.
+- **Findings** — headlines only (what was flagged, small eval n, expected
+  SHAP-on-self). Numbers live in the tables below, not in the bullets.
+- **Coverage** — one compact table of group shares on the profiled CSV.
+- **Outcomes** — **Actual +** (label prevalence) next to **Predicted +**
+  (selection rate), plus TPR and accuracy. Rates are percentages. Eval
+  groups smaller than `min_group_count` are called out in Findings.
+- **SHAP** — top features by mean abs SHAP. Gaps on the grouping column
+  itself are labeled expected when that column is a model feature.
+- **Breakdown** — full group tables, assumptions, dashboard, and the
+  metric glossary. Precision / accuracy / AUC come from `predictions_path`
+  (`y_true` vs `y_pred`; AUC from `y_score`), not the profiled CSV.

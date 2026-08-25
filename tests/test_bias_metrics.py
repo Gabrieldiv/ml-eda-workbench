@@ -1,6 +1,7 @@
 """Unit tests for fairlearn metrics on a separate predictions table."""
 
 import pandas as pd
+import pytest
 
 from eda_workbench.bias.metric_audit import audit_metrics
 from eda_workbench.bias.prepare import resolve_thresholds
@@ -38,6 +39,9 @@ def test_metrics_use_predictions_table_not_profiled_csv():
     assert summary.demographic_parity_difference is not None
     assert abs(summary.demographic_parity_difference) > 0.5
     assert summary.flags
+    assert all(
+        row.actual_positive_rate == pytest.approx(0.5) for row in result.by_group
+    )
 
 
 def test_metrics_skip_without_protected_attributes():
