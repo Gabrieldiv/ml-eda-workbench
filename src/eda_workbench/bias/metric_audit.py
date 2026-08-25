@@ -64,7 +64,12 @@ def _optional_float(value: object) -> float | None:
 
 
 def _is_binary(series: pd.Series) -> bool:
-    return len(pd.unique(series.dropna())) == 2
+    """True only for two-class 0/1 (or bool) labels that fairlearn treats as binary."""
+    values = pd.to_numeric(series.dropna(), errors="coerce")
+    if values.empty or values.isna().any():
+        return False
+    unique = {float(item) for item in values.unique()}
+    return unique == {0.0, 1.0}
 
 
 def _safe_fairness_metric(fn, y_true, y_pred, sensitive) -> float | None:

@@ -51,6 +51,20 @@ def test_load_config_unknown_dataset():
     assert dataset_config["prediction_column"] == "y_pred"
 
 
+def test_get_dataset_config_treats_scalar_names_as_one_item():
+    config = {
+        "datasets": {
+            "toy": {
+                "protected_attributes": "Sex",
+                "model_features": "Age",
+            }
+        }
+    }
+    dataset_config = get_dataset_config("toy", config)
+    assert dataset_config["protected_attributes"] == ["Sex"]
+    assert dataset_config["model_features"] == ["Age"]
+
+
 def test_load_config_titanic_protected_attributes():
     """Titanic example lists Sex and Pclass; eval paths stay optional."""
     config = load_config()

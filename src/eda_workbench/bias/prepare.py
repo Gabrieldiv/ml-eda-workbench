@@ -20,10 +20,29 @@ DEFAULT_THRESHOLDS: dict[str, float | int] = {
 MISSING_GROUP_LABEL = "<missing>"
 
 
+def as_name_list(value: object) -> list[str]:
+    """Normalize YAML names to a list without splitting a string into characters."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    names: list[str] = []
+    try:
+        items = list(value)
+    except TypeError:
+        text = str(value).strip()
+        return [text] if text else []
+    for item in items:
+        text = str(item).strip()
+        if text:
+            names.append(text)
+    return names
+
+
 def protected_attributes(dataset_config: dict) -> list[str]:
     """Return configured protected-attribute column names."""
-    raw = dataset_config.get("protected_attributes") or []
-    return [str(name).strip() for name in raw if str(name).strip()]
+    return as_name_list(dataset_config.get("protected_attributes"))
 
 
 def split_present_attributes(

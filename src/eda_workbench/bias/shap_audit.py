@@ -23,6 +23,7 @@ import pandas as pd
 import shap
 
 from eda_workbench.bias.prepare import (
+    as_name_list,
     group_labels,
     protected_attributes,
     split_present_attributes,
@@ -49,14 +50,16 @@ def resolve_feature_names(model: Any, dataset_config: dict) -> list[str] | None:
 
     configured = dataset_config.get("model_features") or None
     if configured:
-        return [str(name) for name in configured]
+        return as_name_list(configured)
     return None
 
 
 def _as_2d(values: object) -> np.ndarray:
     array = np.asarray(values)
-    if array.ndim == 3:
-        return array[:, :, -1]
+    if array.ndim > 2:
+        raise ValueError(
+            "SHAP values have a class axis; this workbench reports a single output only."
+        )
     if array.ndim == 1:
         return array.reshape(-1, 1)
     return array
@@ -189,14 +192,31 @@ def explain_eval(
     maps = _category_maps(eval_features, feature_names)
     x_background = _to_numeric_view(background, feature_names, maps)
     x_explain = _to_numeric_view(explained, feature_names, maps)
+    predict_fn = _predict_fn(model, feature_names, maps)
+    probe = np.asarray(predict_fn(x_background.iloc[:1]))
+    if probe.ndim == 2 and probe.shape[1] > 1:
+        return ShapAuditResult(
+            skipped=(
+                "SHAP skipped: model output is multiclass. "
+                "This workbench reports attributions for a single output only."
+            )
+        )
 
     explainer = shap.PermutationExplainer(
-        _predict_fn(model, feature_names, maps),
+        predict_fn,
         x_background,
         seed=random_seed,
     )
     explanation = explainer(x_explain)
-    values = _as_2d(explanation.values)
+    try:
+        values = _as_2d(explanation.values)
+    except ValueError:
+        return ShapAuditResult(
+            skipped=(
+                "SHAP skipped: attributions have a class axis (multiclass "
+                "output). This workbench reports a single output only."
+            )
+        )
     mean_abs = np.abs(values).mean(axis=0)
     importance = tuple(
         sorted(

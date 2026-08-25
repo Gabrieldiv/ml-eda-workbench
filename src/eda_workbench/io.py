@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from eda_workbench.bias.prepare import as_name_list
+
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "settings.yaml"
 
 _DATASET_DEFAULTS: dict = {
@@ -72,10 +74,10 @@ def get_dataset_config(dataset_name: str, config: dict) -> dict:
     datasets = config.get("datasets", {})
     if dataset_name in datasets:
         merged.update(datasets[dataset_name])
-    merged["protected_attributes"] = list(merged.get("protected_attributes") or [])
+    merged["protected_attributes"] = as_name_list(merged.get("protected_attributes"))
     features = merged.get("model_features")
     if features is not None:
-        merged["model_features"] = list(features)
+        merged["model_features"] = as_name_list(features)
     return merged
 
 

@@ -4,7 +4,11 @@ import pandas as pd
 import pytest
 
 from eda_workbench.bias.metric_audit import audit_metrics
-from eda_workbench.bias.prepare import resolve_thresholds
+from eda_workbench.bias.prepare import (
+    as_name_list,
+    protected_attributes,
+    resolve_thresholds,
+)
 
 _THRESHOLDS = resolve_thresholds(
     {"rate_difference_threshold": 0.1, "disparate_impact_threshold": 0.8}
@@ -74,3 +78,23 @@ def test_metrics_non_binary_reports_accuracy_only():
     assert result.binary_target is False
     assert result.summaries[0].demographic_parity_difference is None
     assert all(row.accuracy is not None for row in result.by_group)
+
+
+def test_metrics_string_labels_are_not_treated_as_binary():
+    frame = pd.DataFrame(
+        {
+            "y_true": ["yes", "no"] * 3,
+            "y_pred": ["yes", "yes", "no", "no", "yes", "no"],
+            "sex": ["f", "f", "f", "m", "m", "m"],
+        }
+    )
+    result = audit_metrics(frame, _CONFIG, _THRESHOLDS)
+    assert result.skipped is None
+    assert result.binary_target is False
+    assert result.summaries[0].demographic_parity_difference is None
+
+
+def test_protected_attributes_treats_scalar_string_as_one_name():
+    assert as_name_list("Sex") == ["Sex"]
+    assert protected_attributes({"protected_attributes": "Sex"}) == ["Sex"]
+    assert as_name_list(["Sex", "Pclass"]) == ["Sex", "Pclass"]

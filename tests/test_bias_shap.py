@@ -3,10 +3,11 @@
 import joblib
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.linear_model import LogisticRegression
 
 from eda_workbench.bias.identify import identify_bias
-from eda_workbench.bias.shap_audit import explain_eval, resolve_feature_names
+from eda_workbench.bias.shap_audit import _as_2d, explain_eval, resolve_feature_names
 
 
 def _tiny_estimator():
@@ -121,7 +122,35 @@ def test_resolve_feature_names_from_yaml_when_estimator_has_none():
         pass
 
     assert resolve_feature_names(Bare(), {"model_features": ["a", "b"]}) == ["a", "b"]
+    assert resolve_feature_names(Bare(), {"model_features": "Age"}) == ["Age"]
     assert resolve_feature_names(Bare(), {}) is None
+
+
+def test_shap_skips_multiclass_output():
+    features = pd.DataFrame(
+        {
+            "f1": [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2],
+            "f2": [1.0, 2.0, 3.0, 1.5, 2.5, 3.5, 1.2, 2.2, 3.2, 1.8, 2.8, 3.8],
+        }
+    )
+    labels = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2])
+    model = LogisticRegression().fit(features, labels)
+    eval_frame = features.copy()
+    eval_frame["sex"] = ["f", "m"] * 6
+    result = explain_eval(
+        model,
+        eval_frame,
+        {"protected_attributes": ["sex"]},
+        _shap_thresholds(),
+        random_seed=0,
+    )
+    assert result.skipped is not None
+    assert "multiclass" in result.skipped.lower()
+
+
+def test_as_2d_rejects_class_axis():
+    with pytest.raises(ValueError, match="class axis"):
+        _as_2d(np.zeros((4, 3, 2)))
 
 
 def test_shap_skips_when_eval_missing_model_features():
