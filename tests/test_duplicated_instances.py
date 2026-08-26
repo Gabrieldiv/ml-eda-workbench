@@ -101,3 +101,11 @@ def test_duplicated_instances_same_target_no_conflict_flag():
     result = duplicated_instances(df, config)
     assert "1, 2" in result
     assert "0, 0" not in result
+
+
+def test_duplicated_instances_only_id_and_target_columns():
+    """Does not crash when only ID and target columns remain after exclusion."""
+    df = pd.DataFrame({"id": [1, 2, 3], "target": [0, 1, 0]})
+    config = {"id_column": "id", "target_column": "target"}
+    result = duplicated_instances(df, config)
+    assert "no analyzable data remains" in result

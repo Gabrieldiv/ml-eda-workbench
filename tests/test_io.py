@@ -10,6 +10,7 @@ from eda_workbench.io import (
     load_config,
     load_dataset,
     save_markdown,
+    save_plot,
 )
 
 
@@ -86,3 +87,17 @@ def test_save_markdown(tmp_path):
     assert "wine_report.md" in path
     with open(path) as f:
         assert f.read() == "hello"
+
+
+def test_save_plot_closes_figure_after_saving(tmp_path):
+    """Closes the figure after saving to avoid accumulating memory."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [1, 4, 9])
+
+    open_before = len(plt.get_fignums())
+    save_plot(fig, "data/wine.csv", output_dir=str(tmp_path))
+    open_after = len(plt.get_fignums())
+
+    assert open_after == open_before - 1
