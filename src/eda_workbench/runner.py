@@ -3,9 +3,12 @@
 import os
 
 from eda_workbench.analysis import (
+    analysis_provenance,
     basic_info,
+    characteristics_plot,
     duplicated_instances,
     missing_values,
+    outliers_instances,
     pearson_correlation,
     zero_values,
 )
@@ -15,6 +18,7 @@ from eda_workbench.io import (
     load_config,
     load_dataset,
     save_markdown,
+    save_plot,
 )
 from eda_workbench.reporting.bias import render_bias_identification
 
@@ -58,6 +62,11 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
 
     config = load_config()
     limit = config.get("correlation", {}).get("drop_threshold", 0.9)
+    min_pairwise_n = config.get("correlation", {}).get("min_pairwise_n", 30)
+    whisker_multiplier = config.get("outliers", {}).get("outlier_factor", 1.5)
+    low_cardinality_threshold = config.get("data_types", {}).get(
+        "low_cardinality_threshold", 10
+    )
 
     for csv_path in csv_files:
         print(f"\nProcessing: {csv_path}")
@@ -69,7 +78,15 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         df = load_dataset(csv_path, dataset_config)
 
         report = f"# EDA Report — {base_name}\n\n"
-        report += basic_info(df, dataset_config["id_column"])
+        report += analysis_provenance(
+            base_name,
+            limit,
+            min_pairwise_n,
+            whisker_multiplier,
+            low_cardinality_threshold,
+        )
+
+        report += f"\n\n{basic_info(df, dataset_config)}"
         report += "\n\n## Missing Values\n"
         report += (
             f"- **Instances with missing values**: {missing_values(df)} "
@@ -77,7 +94,10 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         )
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
-        report += f"\n\n{pearson_correlation(df, dataset_config, limit)}"
+        report += (
+            f"\n\n{pearson_correlation(df, dataset_config, limit, min_pairwise_n, low_cardinality_threshold)}"
+        )
+
         # Paper Section 6 (identification): coverage §6.3, metrics §6.1/§5,
         # SHAP as tabular §6.2 family. Never scores this profiled CSV.
         bias_cfg = config.get("bias", {})
@@ -95,6 +115,17 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
             grouping_columns=dataset_config.get("protected_attributes") or [],
             thresholds=bias_cfg,
         )
+
+        report += (
+            f"\n\n{outliers_instances(df, dataset_config, whisker_multiplier, low_cardinality_threshold)}"
+        )
+
+        plot_text, figure = characteristics_plot(df, dataset_config)
+        report += f"\n\n{plot_text}"
+        if figure is not None:
+            image_path = save_plot(figure, csv_path, output_dir=output_dir)
+            image_name = os.path.basename(image_path)
+            report += f"\n\n![Characteristics Value Ranges]({image_name})"
 
         print(report)
 

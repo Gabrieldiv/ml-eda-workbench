@@ -16,16 +16,23 @@ def duplicated_instances(df: pd.DataFrame, config: dict) -> str:
         Markdown-formatted string with a table of duplicated instance groups
         (identified by ID when available, otherwise by row index), including
         a column flagging conflicting target values within a group when
-        present. States none were found otherwise.
+        present. States none were found otherwise. States that no analyzable
+        data remains when only ID and target columns are present.
     """
     id_column = config.get("id_column")
     target_column = config.get("target_column")
     exclude = {col for col in [id_column, target_column] if col is not None}
 
     df_feat = df.drop(columns=list(exclude), errors="ignore")
+    lines = ["## Duplicated Instances"]
+
+    if len(df_feat.columns) == 0:
+        lines.append(
+            "- **After ID and Target columns removal, no analyzable data remains**"
+        )
+        return "\n".join(lines)
 
     duplicated_mask = df_feat.duplicated(keep=False)
-    lines = ["## Duplicated Instances"]
 
     if not duplicated_mask.any():
         lines.append("- **No duplicated instances found**")

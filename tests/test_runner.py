@@ -43,3 +43,20 @@ def test_process_folder_generates_reports(tmp_path):
     assert "## Bias Identification" in content
     assert "no protected attributes configured" in content
     assert "sec:identification" not in content
+
+
+def test_process_folder_skips_plot_when_no_numeric_data(tmp_path):
+    """Does not embed an image reference when there's no numeric data to plot."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "text_only.csv").write_text("nome\nAna\nBruno")
+
+    output_dir = tmp_path / "output"
+
+    process_folder(data_dir=str(data_dir), output_dir=str(output_dir))
+
+    reports = list(output_dir.glob("*.md"))
+    assert len(reports) > 0
+
+    content = reports[0].read_text(encoding="utf-8")
+    assert "![Characteristics Value Ranges]" not in content

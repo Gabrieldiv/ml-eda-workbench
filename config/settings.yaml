@@ -42,9 +42,27 @@ experiment:
 
 correlation:
   # Pearson correlation threshold (absolute value) above which two
-  # characteristics are considered redundant. Used to flag candidates
-  # for removal and reduce dimensionality.
+  # characteristics are considered redundant. Flags a candidate for
+  # manual review — not an automatic removal decision (see the
+  # report's "Candidate for Review" section for the heuristic used).
   drop_threshold: 0.9
+  # Minimum number of overlapping non-null rows required to trust a
+  # pairwise correlation. Pairs with fewer valid rows are reported as
+  # insufficient data instead of being evaluated against drop_threshold.
+  min_pairwise_n: 30
+
+data_types:
+  # Numeric characteristics with this many or fewer distinct values are
+  # flagged as potentially categorical/ordinal codes (binary flags, IDs,
+  # counts) rather than continuous measures, since IQR outlier detection
+  # and Pearson correlation may not be statistically meaningful for them.
+  low_cardinality_threshold: 10
+
+outliers:
+  # Boxplot outlier factor — how many IQRs beyond Q1/Q3 count as an
+  # outlier. The conventional value is 1.5.
+  outlier_factor: 1.5
+
 
 plots:
   # Default figure size in inches [width, height]
@@ -55,6 +73,7 @@ plots:
   dpi: 150
   # Directory where figures are saved by helper utilities
   save_dir: "outputs/figures/"
+
 
 profiling:
   # Set to true for a faster (less detailed) ydata-profiling report
