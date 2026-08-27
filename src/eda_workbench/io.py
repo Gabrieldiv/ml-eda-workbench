@@ -8,7 +8,29 @@ import pandas as pd
 import yaml
 from matplotlib.figure import Figure
 
+from eda_workbench.bias.prepare import as_name_list
+
 _DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "settings.yaml"
+
+_DATASET_DEFAULTS: dict = {
+    "separator": ",",
+    "encoding": "utf-8",
+    "id_column": None,
+    "target_column": "target",
+    "protected_attributes": [],
+    "eval_path": None,
+    "predictions_path": None,
+    "model_path": None,
+    "prediction_column": "y_pred",
+    "score_column": "y_score",
+    "model_features": None,
+}
+
+
+def _dataset_defaults() -> dict:
+    defaults = dict(_DATASET_DEFAULTS)
+    defaults["protected_attributes"] = list(_DATASET_DEFAULTS["protected_attributes"])
+    return defaults
 
 
 def load_config(config_path: str | os.PathLike[str] | None = None) -> dict:
@@ -47,18 +69,18 @@ def get_dataset_config(dataset_name: str, config: dict) -> dict:
         config: Full configuration dictionary loaded from YAML.
 
     Returns:
-        Dictionary with separator, encoding, id_column and target_column.
+        Dictionary with separator, encoding, id/target columns, protected
+        attributes, and optional eval-bundle paths.
     """
+    merged = _dataset_defaults()
     datasets = config.get("datasets", {})
     if dataset_name in datasets:
-        return dict(datasets[dataset_name])
-
-    return {
-        "separator": ",",
-        "encoding": "utf-8",
-        "id_column": None,
-        "target_column": "target",
-    }
+        merged.update(datasets[dataset_name])
+    merged["protected_attributes"] = as_name_list(merged.get("protected_attributes"))
+    features = merged.get("model_features")
+    if features is not None:
+        merged["model_features"] = as_name_list(features)
+    return merged
 
 
 def load_dataset(csv_path: str, config: dict) -> pd.DataFrame:

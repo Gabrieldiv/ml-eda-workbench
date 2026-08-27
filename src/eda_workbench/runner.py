@@ -12,6 +12,7 @@ from eda_workbench.analysis import (
     pearson_correlation,
     zero_values,
 )
+from eda_workbench.bias.identify import identify_bias
 from eda_workbench.io import (
     get_dataset_config,
     load_config,
@@ -19,6 +20,7 @@ from eda_workbench.io import (
     save_markdown,
     save_plot,
 )
+from eda_workbench.reporting.bias import render_bias_identification
 
 # -----------------------------------------------------------------------------
 # ORCHESTRATION
@@ -93,6 +95,25 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
         report += f"\n\n{pearson_correlation(df, dataset_config, limit, min_pairwise_n, low_cardinality_threshold)}"
+
+        # Paper Section 6 (identification): coverage §6.3, metrics §6.1/§5,
+        # SHAP as tabular §6.2 family. Never scores this profiled CSV.
+        bias_cfg = config.get("bias", {})
+        bias_result = identify_bias(
+            df,
+            dataset_config,
+            bias_cfg,
+            profiled_path=csv_path,
+            random_seed=config.get("experiment", {}).get("random_seed", 42),
+        )
+        report += "\n\n" + render_bias_identification(
+            bias_result,
+            detail=bias_cfg.get("report_detail", "summary"),
+            target_column=dataset_config.get("target_column"),
+            grouping_columns=dataset_config.get("protected_attributes") or [],
+            thresholds=bias_cfg,
+        )
+
         report += f"\n\n{outliers_instances(df, dataset_config, whisker_multiplier, low_cardinality_threshold)}"
 
         plot_text, figure = characteristics_plot(df, dataset_config)

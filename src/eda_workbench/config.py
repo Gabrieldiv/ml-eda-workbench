@@ -70,6 +70,27 @@ class ProfilingConfig:
     output_file: str = "outputs/profile_report.html"
 
 
+@dataclasses.dataclass
+class BiasConfig:
+    """Thresholds and report verbosity for bias identification.
+
+    Paper: Section 6 identification. Coverage cutoffs follow §6.3
+    representational coverage; rate/ratio flags follow the §6.1 dashboard
+    (families in §5); SHAP sample sizes support the §6.2 family.
+    ``report_detail`` is presentation-only (``summary`` or ``full``).
+    """
+
+    report_detail: str = "summary"
+    min_group_count: int = 30
+    min_group_share: float = 0.05
+    sparse_intersection_share: float = 0.01
+    rate_difference_threshold: float = 0.1
+    disparate_impact_threshold: float = 0.8
+    shap_background_size: int = 50
+    shap_explain_size: int = 100
+    shap_attribution_gap_threshold: float = 0.1
+
+
 # ---------------------------------------------------------------------------
 # Root settings
 # ---------------------------------------------------------------------------
@@ -95,6 +116,7 @@ class Settings:
     experiment: ExperimentConfig = dataclasses.field(default_factory=ExperimentConfig)
     plots: PlotsConfig = dataclasses.field(default_factory=PlotsConfig)
     profiling: ProfilingConfig = dataclasses.field(default_factory=ProfilingConfig)
+    bias: BiasConfig = dataclasses.field(default_factory=BiasConfig)
 
     @classmethod
     def from_yaml(cls, path: Path | str | None = None) -> Settings:
@@ -118,4 +140,5 @@ class Settings:
             experiment=ExperimentConfig(**raw.get("experiment", {})),
             plots=PlotsConfig(**raw.get("plots", {})),
             profiling=ProfilingConfig(**raw.get("profiling", {})),
+            bias=BiasConfig(**raw.get("bias", {})),
         )

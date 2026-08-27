@@ -5,6 +5,7 @@ description = "ML/EDA workbench for exploratory data analysis and feature invest
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fairlearn>=0.14.0",
     "ipykernel>=6.29",
     "jupyter>=1.1",
     "matplotlib>=3.9",
@@ -15,6 +16,7 @@ dependencies = [
     "scikit-learn>=1.5",
     "scipy>=1.14",
     "seaborn>=0.13",
+    "shap>=0.52.0",
     "sweetviz>=2.3",
     "tzdata>=2024.1",
     "ydata-profiling>=4.10",

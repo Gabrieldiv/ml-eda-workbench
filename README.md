@@ -75,12 +75,20 @@ ml-eda-workbench/
 ├── config/
 │   └── settings.yaml           # ← Edit this to configure your experiment
 ├── data/                       # Place your CSV / Parquet files here
+├── docs/
+│   ├── bias-identification.md  # Eval bundle, assumptions, paper mapping
+│   └── bias-roadmap.md         # All paper techniques by implementation lift
 ├── notebooks/
 │   └── 01_eda_starter.ipynb    # Starting point for analysis
 ├── src/
 │   └── eda_workbench/
 │       ├── __init__.py
-│       └── config.py           # Settings loader
+│       ├── analysis/               # EDA analyses (Markdown strings)
+│       ├── bias/                   # Bias identification (structured results)
+│       ├── reporting/              # Markdown renderers
+│       ├── config.py               # Settings loader
+│       ├── io.py                   # Dataset config and file I/O
+│       └── runner.py               # Report orchestration
 ├── tests/
 │   ├── conftest.py             # Shared fixtures
 │   └── test_smoke.py           # Environment health checks
@@ -93,7 +101,8 @@ ml-eda-workbench/
 ## Configuration
 
 All experiment parameters live in **`config/settings.yaml`**.
-Edit this file to change dataset paths, random seed, plot style, etc.
+Edit this file to change dataset paths, random seed, plot style, protected
+attributes, and optional eval-bundle paths for bias identification.
 No code changes are needed.
 
 ```yaml
@@ -121,6 +130,31 @@ cfg = Settings.from_yaml()
 print(cfg.experiment.random_seed)   # 42
 print(cfg.data.train_path)          # PosixPath('data/train.csv')
 ```
+
+---
+
+## Bias identification
+
+The workbench can audit **representational coverage** on the profiled CSV and,
+when you supply a separate evaluation bundle, a **fairlearn metrics dashboard**
+and **SHAP** attributions. It never trains a model and never scores the
+profiled dataset.
+
+These follow the review paper's Identification section (Section 6): coverage
+is §6.3 (named there); the dashboard is §6.1 with metric families from
+Section 5; SHAP is this workbench's tabular instantiation of §6.2
+explainability-driven diagnosis (the paper describes saliency / perturbation
+maps and does not name SHAP).
+
+See [docs/bias-identification.md](docs/bias-identification.md) for eval-bundle
+formats, evaluation assumptions, paper section mapping, and the Markdown
+report layout (`bias.report_detail`: `summary` or `full`). Paper citations
+stay in those docs, not in the generated report.
+
+The **roadmap** of every paper technique, tagged Low / Medium / High / Very
+high (implemented vs not, including out-of-scope mitigation), is
+[docs/bias-roadmap.md](docs/bias-roadmap.md) and
+`eda_workbench.bias.roadmap`.
 
 ---
 

@@ -36,6 +36,7 @@ def test_load_config_valid_dataset():
     dataset_config = get_dataset_config("wine", config)
     assert dataset_config["separator"] == ","
     assert dataset_config["encoding"] == "utf-8"
+    assert dataset_config["protected_attributes"] == []
 
 
 def test_load_config_unknown_dataset():
@@ -44,6 +45,35 @@ def test_load_config_unknown_dataset():
     dataset_config = get_dataset_config("non_existent_dataset", config)
     assert dataset_config["separator"] == ","
     assert dataset_config["id_column"] is None
+    assert dataset_config["protected_attributes"] == []
+    assert dataset_config["eval_path"] is None
+    assert dataset_config["predictions_path"] is None
+    assert dataset_config["model_path"] is None
+    assert dataset_config["prediction_column"] == "y_pred"
+
+
+def test_get_dataset_config_treats_scalar_names_as_one_item():
+    config = {
+        "datasets": {
+            "toy": {
+                "protected_attributes": "Sex",
+                "model_features": "Age",
+            }
+        }
+    }
+    dataset_config = get_dataset_config("toy", config)
+    assert dataset_config["protected_attributes"] == ["Sex"]
+    assert dataset_config["model_features"] == ["Age"]
+
+
+def test_load_config_titanic_protected_attributes():
+    """Titanic example lists Sex and Pclass; eval paths stay optional."""
+    config = load_config()
+    dataset_config = get_dataset_config("titanic_train", config)
+    assert dataset_config["protected_attributes"] == ["Sex", "Pclass"]
+    assert dataset_config["eval_path"] is None
+    assert dataset_config["predictions_path"] is None
+    assert dataset_config["model_path"] is None
 
 
 def test_load_config_explicit_path(tmp_path):

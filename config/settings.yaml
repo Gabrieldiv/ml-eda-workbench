@@ -10,6 +10,11 @@ datasets:
     encoding: "utf-8"
     id_column: "PassengerId"
     target_column: "Survived"
+    # Grouping columns in this CSV (not inferred). Pclass = ticket class 1/2/3.
+    protected_attributes: [Sex, Pclass]
+    eval_path: null  # e.g. data/titanic_eval.csv — NOT the profiled file
+    predictions_path: null  # e.g. data/titanic_eval_predictions.csv
+    model_path: null  # e.g. data/titanic_model.joblib
   
   iris:
     separator: ","
@@ -75,3 +80,24 @@ profiling:
   minimal: false
   # Output path for the HTML profiling report
   output_file: "outputs/profile_report.html"
+
+bias:
+  # summary: findings + compact tables; full tables in a collapsible breakdown
+  # full: expand every coverage / metric / SHAP table
+  report_detail: summary
+  # Group is underrepresented when n is below this count
+  min_group_count: 30
+  # Group is underrepresented when its share of rows is below this fraction
+  min_group_share: 0.05
+  # Intersectional combination is sparse when its share is below this fraction
+  sparse_intersection_share: 0.01
+  # Flag rate gaps (demographic parity, equal opportunity, accuracy) above this
+  rate_difference_threshold: 0.1
+  # Flag demographic-parity ratio below this value (four-fifths rule: 0.8)
+  disparate_impact_threshold: 0.8
+  # Background sample size passed to shap.Explainer
+  shap_background_size: 50
+  # Number of eval rows to explain
+  shap_explain_size: 100
+  # Flag features whose mean SHAP differs across groups by more than this
+  shap_attribution_gap_threshold: 0.1

@@ -11,12 +11,16 @@ def test_settings_defaults():
     assert cfg.experiment.random_seed == 42
     assert cfg.experiment.test_size == 0.2
     assert cfg.data.target_column == "target"
+    assert cfg.bias.report_detail == "summary"
 
 
 def test_settings_from_yaml(settings):
     """from_yaml() correctly loads values from config/settings.yaml."""
     assert settings.experiment.random_seed == 42
     assert settings.data.path == "data/"
+    assert settings.bias.min_group_count == 30
+    assert settings.bias.disparate_impact_threshold == 0.8
+    assert settings.bias.report_detail == "summary"
 
 
 def test_data_config_train_path():
