@@ -50,6 +50,8 @@ correlation:
   # pairwise correlation. Pairs with fewer valid rows are reported as
   # insufficient data instead of being evaluated against drop_threshold.
   min_pairwise_n: 30
+    # Which correlation plot(s) to generate: "heatmap", "violin", or "both".
+  plot_mode: "both"
 
 data_types:
   # Numeric characteristics with this many or fewer distinct values are

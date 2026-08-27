@@ -154,3 +154,56 @@ def save_plot(figure: Figure, csv_path: str, output_dir: str = "output") -> str:
     plt.close(figure)
 
     return path
+
+
+def save_correlation_outputs(
+    figures: dict[str, Figure],
+    correlation_matrix: pd.DataFrame,
+    base_name: str,
+    output_dir: str = "output",
+) -> str:
+    """Save correlation plots and the correlation matrix into a per-dataset folder.
+
+    Creates ``{output_dir}/{base_name}_correlation/`` and writes
+    ``correlation_matrix.csv`` (when the matrix has data), plus
+    ``correlation_heatmap.png`` and/or ``correlation_violin.png`` for
+    whichever figures are present. Each figure is closed after saving.
+
+    Args:
+        figures: Dict with optional "heatmap" and/or "violin" Figure objects.
+        correlation_matrix: The full correlation matrix to export as CSV.
+        base_name: Dataset name (without extension), used to name the folder.
+        output_dir: Directory where the folder is created. Default: "output".
+
+    Returns:
+        Name of the created subfolder (e.g. "wine_correlation"), for building
+        a relative Markdown image path. Empty string when there is nothing
+        to save (no figures and an empty matrix).
+    """
+    if not figures and correlation_matrix.empty:
+        return ""
+
+    folder_name = f"{base_name}_correlation"
+    folder_path = os.path.join(output_dir, folder_name)
+    os.makedirs(folder_path, exist_ok=True)
+
+    if not correlation_matrix.empty:
+        correlation_matrix.to_csv(os.path.join(folder_path, "correlation_matrix.csv"))
+
+    if "heatmap" in figures:
+        figures["heatmap"].savefig(
+            os.path.join(folder_path, "correlation_heatmap.png"),
+            dpi=150,
+            bbox_inches="tight",
+        )
+        plt.close(figures["heatmap"])
+
+    if "violin" in figures:
+        figures["violin"].savefig(
+            os.path.join(folder_path, "correlation_violin.png"),
+            dpi=150,
+            bbox_inches="tight",
+        )
+        plt.close(figures["violin"])
+
+    return folder_name

@@ -17,6 +17,7 @@ from eda_workbench.io import (
     get_dataset_config,
     load_config,
     load_dataset,
+    save_correlation_outputs,
     save_markdown,
     save_plot,
 )
@@ -63,6 +64,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
     config = load_config()
     limit = config.get("correlation", {}).get("drop_threshold", 0.9)
     min_pairwise_n = config.get("correlation", {}).get("min_pairwise_n", 30)
+    plot_mode = config.get("correlation", {}).get("plot_mode", "heatmap")
     whisker_multiplier = config.get("outliers", {}).get("outlier_factor", 1.5)
     low_cardinality_threshold = config.get("data_types", {}).get(
         "low_cardinality_threshold", 10
@@ -94,7 +96,30 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         )
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
-        report += f"\n\n{pearson_correlation(df, dataset_config, limit, min_pairwise_n, low_cardinality_threshold)}"
+
+        corr_text, corr_figures, corr_matrix = pearson_correlation(
+            df,
+            dataset_config,
+            limit,
+            min_pairwise_n,
+            low_cardinality_threshold,
+            plot_mode,
+        )
+        report += f"\n\n{corr_text}"
+
+        corr_folder = save_correlation_outputs(
+            corr_figures, corr_matrix, base_name, output_dir=output_dir
+        )
+        if "heatmap" in corr_figures:
+            report += (
+                f"\n\n![Pearson Correlation Heatmap]"
+                f"({corr_folder}/correlation_heatmap.png)"
+            )
+        if "violin" in corr_figures:
+            report += (
+                f"\n\n![Pearson Correlation Violin Plot]"
+                f"({corr_folder}/correlation_violin.png)"
+            )
 
         # Paper Section 6 (identification): coverage §6.3, metrics §6.1/§5,
         # SHAP as tabular §6.2 family. Never scores this profiled CSV.

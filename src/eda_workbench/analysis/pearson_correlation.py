@@ -1,5 +1,10 @@
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 
 def pearson_correlation(
@@ -8,7 +13,8 @@ def pearson_correlation(
     limit: float,
     min_pairwise_n: int = 30,
     low_cardinality_threshold: int = 10,
-) -> str:
+    plot_mode: str = "heatmap",
+) -> tuple[str, dict[str, plt.Figure], pd.DataFrame]:
     """Report pairs of highly correlated (redundant) characteristics.
 
     Compares every pair of numeric characteristics via Pearson correlation,
@@ -25,6 +31,14 @@ def pearson_correlation(
     automatic removal decision: it does not account for target association,
     missingness, domain meaning, or validation performance.
 
+    Depending on ``plot_mode``, also builds a heatmap of the full
+    correlation matrix, a violin plot of each characteristic's correlation
+    distribution with every other characteristic, or both. In both plots,
+    pairs with insufficient N are masked out (not shown), for the same
+    reason they are excluded from the "Candidate for Review" heuristic and
+    reported separately in the text: an untrustworthy correlation should
+    not visually read as a real relationship.
+
     Args:
         df: DataFrame with the dataset data.
         config: Dictionary with dataset settings (id_column, target_column).
@@ -36,13 +50,23 @@ def pearson_correlation(
             fewer distinct values are flagged as potentially categorical or
             ordinal codes, since Pearson correlation may not be meaningful
             for them. Default: 10.
+        plot_mode: One of "heatmap", "violin", or "both". Controls which
+            correlation plot(s) are generated. Default: "heatmap".
 
     Returns:
-        Markdown-formatted string with a table of redundant characteristic
-        pairs (including N), their correlation, and a candidate for manual
-        review. Also lists skipped non-numeric characteristics, low-
-        cardinality numeric characteristics, pairs whose correlation could
-        not be computed, and pairs with insufficient overlapping data.
+        A tuple of (markdown_text, figures, correlation_matrix):
+        - markdown_text: table of redundant characteristic pairs (including
+          N), their correlation, and a candidate for manual review. Also
+          lists skipped non-numeric characteristics, low-cardinality
+          numeric characteristics, pairs whose correlation could not be
+          computed, and pairs with insufficient overlapping data.
+        - figures: dict with keys "heatmap" and/or "violin" mapping to the
+          generated Figure objects, per ``plot_mode``. Empty when there are
+          fewer than two numeric characteristics to compare.
+        - correlation_matrix: the full raw Pearson correlation matrix
+          (unmasked), for callers that want to export it (e.g. as CSV).
+          Empty DataFrame when there are fewer than two numeric
+          characteristics to compare.
     """
     id_column = config.get("id_column")
     target_column = config.get("target_column")
@@ -73,13 +97,13 @@ def pearson_correlation(
 
     if not numeric_columns:
         lines.append("- **No numeric characteristics found**")
-        return "\n".join(lines)
+        return "\n".join(lines), {}, pd.DataFrame()
 
     if len(numeric_columns) < 2:
         lines.append(
             "- **Not enough numeric characteristics to compare (at least two required)**"
         )
-        return "\n".join(lines)
+        return "\n".join(lines), {}, pd.DataFrame()
 
     df_numeric = df_feat[numeric_columns]
     total_rows = len(df_numeric)
@@ -109,9 +133,27 @@ def pearson_correlation(
         sufficient_pairs.abs() >= limit
     ]
 
+    # Mask used by BOTH the candidate-selection average and the plots below:
+    # hides the diagonal and any pair with insufficient N, so an
+    # untrustworthy correlation never counts as a real relationship,
+    # whether in a number, a heatmap cell, or a violin's data points.
+    no_diagonal = ~np.eye(len(correlation_matrix), dtype=bool)
+    sufficient_n = n_matrix >= min_pairwise_n
+    trustworthy_mask = (
+        pd.DataFrame(
+            no_diagonal,
+            index=correlation_matrix.index,
+            columns=correlation_matrix.columns,
+        )
+        & sufficient_n
+    )
+
     if nan_pairs.empty and insufficient_n_pairs.empty and redundant_pairs.empty:
         lines.append(f"- **All correlations below the defined limit ({limit})**")
-        return "\n".join(lines)
+        figures = _build_correlation_plots(
+            correlation_matrix, trustworthy_mask, plot_mode
+        )
+        return "\n".join(lines), figures, correlation_matrix
 
     if not nan_pairs.empty:
         if len(lines) > 1:
@@ -140,17 +182,7 @@ def pearson_correlation(
             )
 
     if not redundant_pairs.empty:
-        no_diagonal = ~np.eye(len(correlation_matrix), dtype=bool)
-        sufficient_n = n_matrix >= min_pairwise_n
-        combined_mask = (
-            pd.DataFrame(
-                no_diagonal,
-                index=correlation_matrix.index,
-                columns=correlation_matrix.columns,
-            )
-            & sufficient_n
-        )
-        mean_abs_corr = correlation_matrix.abs().where(combined_mask).mean()
+        mean_abs_corr = correlation_matrix.abs().where(trustworthy_mask).mean()
 
         rows = []
         for (column_a, column_b), corr_value in redundant_pairs.items():
@@ -200,4 +232,77 @@ def pearson_correlation(
                 f"{n_text:<{col3_width}} | {candidate:<{col4_width}} |"
             )
 
-    return "\n".join(lines)
+    figures = _build_correlation_plots(correlation_matrix, trustworthy_mask, plot_mode)
+    return "\n".join(lines), figures, correlation_matrix
+
+
+def _build_correlation_plots(
+    correlation_matrix: pd.DataFrame,
+    trustworthy_mask: pd.DataFrame,
+    plot_mode: str,
+) -> dict[str, plt.Figure]:
+    """Build the requested correlation plot(s), masking untrustworthy pairs.
+
+    Args:
+        correlation_matrix: Full raw Pearson correlation matrix.
+        trustworthy_mask: True where a cell should be shown (not the
+            diagonal, and N at or above the configured minimum).
+        plot_mode: One of "heatmap", "violin", or "both".
+
+    Returns:
+        Dict with keys "heatmap" and/or "violin" mapping to Figure objects,
+        for whichever plot(s) ``plot_mode`` requests.
+    """
+    figures: dict[str, plt.Figure] = {}
+    hide_mask = ~trustworthy_mask
+
+    if plot_mode in ("heatmap", "both"):
+        fig, ax = plt.subplots(
+            figsize=(
+                max(6, len(correlation_matrix) * 0.8),
+                max(5, len(correlation_matrix) * 0.7),
+            )
+        )
+        sns.heatmap(
+            correlation_matrix,
+            mask=hide_mask,
+            annot=True,
+            fmt=".2f",
+            cmap="RdBu_r",
+            vmin=-1,
+            vmax=1,
+            center=0,
+            ax=ax,
+            cbar_kws={"label": "Pearson correlation"},
+        )
+        ax.set_title("Pearson Correlation Heatmap (blank: insufficient N or diagonal)")
+        fig.tight_layout()
+        figures["heatmap"] = fig
+
+    if plot_mode in ("violin", "both"):
+        trustworthy_values = correlation_matrix.where(trustworthy_mask)
+        columns = list(correlation_matrix.columns)
+
+        plotted_columns = []
+        dataset = []
+        for column in columns:
+            values = trustworthy_values[column].dropna().to_numpy()
+            if len(values) > 0:
+                plotted_columns.append(column)
+                dataset.append(values)
+
+        if dataset:
+            fig, ax = plt.subplots(figsize=(max(6, len(plotted_columns) * 0.8), 6))
+            ax.violinplot(dataset, showmeans=True, showextrema=True)
+            ax.set_xticks(range(1, len(plotted_columns) + 1))
+            ax.set_xticklabels(plotted_columns, rotation=45, ha="right")
+            ax.set_ylabel("Pearson correlation with other characteristics")
+            ax.set_title(
+                "Distribution of Pairwise Correlations per Characteristic "
+                "(insufficient-N pairs excluded)"
+            )
+            ax.axhline(0, color="gray", linestyle="--", linewidth=1, alpha=0.5)
+            fig.tight_layout()
+            figures["violin"] = fig
+
+    return figures
