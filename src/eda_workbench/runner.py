@@ -6,6 +6,7 @@ from eda_workbench.analysis import (
     analysis_provenance,
     basic_info,
     characteristics_plot,
+    class_distribution,
     duplicated_instances,
     missing_values,
     outliers_instances,
@@ -69,6 +70,9 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
     low_cardinality_threshold = config.get("data_types", {}).get(
         "low_cardinality_threshold", 10
     )
+    class_dist_threshold = config.get("class_distribution", {}).get(
+        "high_cardinality_threshold", 20
+    )
 
     for csv_path in csv_files:
         print(f"\nProcessing: {csv_path}")
@@ -96,6 +100,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         )
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
+        report += f"\n\n{class_distribution(df, dataset_config, class_dist_threshold)}"
 
         corr_text, corr_figures, corr_matrix = pearson_correlation(
             df,
