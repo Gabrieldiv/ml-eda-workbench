@@ -292,3 +292,62 @@ def test_load_eval_bundle_missing_and_unreadable_files(tmp_path):
         profiled_path=str(profiled),
     )
     assert "could not load model" in (model_unreadable.shap_skip or "")
+
+
+def test_same_file_returns_false_on_os_error(monkeypatch):
+    """Returns False, not raising, when path resolution itself fails."""
+    from pathlib import Path
+
+    from eda_workbench.bias.artifacts import _same_file
+
+    def _raise(self, *args, **kwargs):
+        raise OSError("boom")
+
+    monkeypatch.setattr(Path, "resolve", _raise)
+    assert _same_file("a.csv", "b.csv") is False
+
+
+def test_load_eval_bundle_works_without_profiled_path_argument(tmp_path):
+    """Does not attempt the same-file check (and does not crash) when
+    profiled_path is omitted entirely."""
+    predictions_path = tmp_path / "predictions.csv"
+    predictions_path.write_text("y_true,y_pred\n1,1\n0,1\n")
+
+    dataset_config = {"predictions_path": str(predictions_path)}
+    bundle = load_eval_bundle(dataset_config)  # profiled_path omitted
+
+    assert bundle.predictions is not None
+    assert bundle.metrics_skip is None
+
+
+def test_identify_runs_metrics_successfully_end_to_end(tmp_path):
+    """When a valid predictions bundle produces a clean fairlearn result
+    (no skip reason), the metrics.skipped-is-falsy branch is exercised —
+    covers the case where audit_metrics succeeds without exception AND
+    without its own skip condition firing."""
+    preds = tmp_path / "preds.csv"
+    pd.DataFrame(
+        {
+            "y_true": [0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0],
+            "y_pred": [0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0],
+            "sex": ["f", "m"] * 10,
+        }
+    ).to_csv(preds, index=False)
+
+    profiled = pd.DataFrame({"sex": ["f", "m"]})
+    profiled_path = tmp_path / "profiled.csv"
+    profiled.to_csv(profiled_path, index=False)
+
+    result = identify_bias(
+        profiled,
+        {
+            "protected_attributes": ["sex"],
+            "predictions_path": str(preds),
+            "separator": ",",
+            "encoding": "utf-8",
+        },
+        profiled_path=str(profiled_path),
+    )
+
+    assert result.ran_metrics is True
+    assert result.metrics.skipped is None

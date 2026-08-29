@@ -60,3 +60,26 @@ def test_process_folder_skips_plot_when_no_numeric_data(tmp_path):
 
     content = reports[0].read_text(encoding="utf-8")
     assert "![Characteristics Value Ranges]" not in content
+
+
+def test_process_folder_embeds_violin_plot_when_configured(tmp_path, monkeypatch):
+    """Embeds the violin plot image reference in the report when plot_mode
+    includes violin."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "test.csv").write_text(
+        "a,b,c\n" + "\n".join(f"{i},{i * 2},{i * 3}" for i in range(1, 40))
+    )
+
+    output_dir = tmp_path / "output"
+
+    fake_config = {"correlation": {"plot_mode": "violin", "min_pairwise_n": 2}}
+    monkeypatch.setattr("eda_workbench.runner.load_config", lambda: fake_config)
+
+    process_folder(data_dir=str(data_dir), output_dir=str(output_dir))
+
+    reports = list(output_dir.glob("*.md"))
+    assert len(reports) > 0
+
+    content = reports[0].read_text(encoding="utf-8")
+    assert "![Pearson Correlation Violin Plot]" in content
