@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from eda_workbench.bias.prepare import as_name_list
+from eda_workbench.bias.prepare import MISSING_GROUP_LABEL, as_name_list
 
 
 def class_distribution(
@@ -17,9 +17,12 @@ def class_distribution(
     makes the analysis "multilabel": there is no separate flag, the
     behavior is entirely driven by how many columns are configured.
 
-    Missing values (NaN) within a label column are reported as their own
-    category, labeled "None" — never inferred or filled in, since doing
-    so would misrepresent a data gap as a real, observed label.
+    Missing values (NaN) are kept distinct from any real value during
+    counting — including a column that happens to have a genuine "None"
+    category — and are only formatted for display afterward, as
+    ``"<missing>"`` (matching the same convention used in the bias
+    module). Merging them before counting would overstate a real label
+    that collides with the display text and hide missingness entirely.
 
     Args:
         df: DataFrame with the dataset data.
@@ -72,8 +75,7 @@ def class_distribution(
     total_rows = len(df)
 
     for column in present_columns:
-        series = df[column].fillna("None").astype(str)
-        counts = series.value_counts()
+        counts = df[column].value_counts(dropna=False)
 
         lines.append("")
         lines.append(f"### {column}")
@@ -86,24 +88,23 @@ def class_distribution(
             counts = counts.head(high_cardinality_threshold)
 
         for value, count in counts.items():
+            label = MISSING_GROUP_LABEL if pd.isna(value) else str(value)
             pct = 100 * count / total_rows
-            lines.append(f"- **{value}**: {count} out of {total_rows} ({pct:.1f}%)")
+            lines.append(f"- **{label}**: {count} out of {total_rows} ({pct:.1f}%)")
 
     if len(present_columns) > 1:
-        combo_series = df[present_columns].fillna("None").astype(str)
-        combo_counts = combo_series.value_counts()
-        if not combo_counts.empty:
-            top_combo = combo_counts.index[0]
-            top_count = combo_counts.iloc[0]
-            pct = 100 * top_count / total_rows
-            combo_desc = ", ".join(
-                f"{column} = {value}"
-                for column, value in zip(present_columns, top_combo, strict=True)
-            )
-            lines.append("")
-            lines.append(
-                f"**Most common multilabel combination**: {combo_desc} — "
-                f"{top_count} out of {total_rows} ({pct:.1f}%)"
-            )
+        combo_counts = df[present_columns].value_counts(dropna=False)
+        top_combo = combo_counts.index[0]
+        top_count = combo_counts.iloc[0]
+        pct = 100 * top_count / total_rows
+        combo_desc = ", ".join(
+            f"{column} = {MISSING_GROUP_LABEL if pd.isna(value) else value}"
+            for column, value in zip(present_columns, top_combo, strict=True)
+        )
+        lines.append("")
+        lines.append(
+            f"**Most common multilabel combination**: {combo_desc} — "
+            f"{top_count} out of {total_rows} ({pct:.1f}%)"
+        )
 
     return "\n".join(lines)

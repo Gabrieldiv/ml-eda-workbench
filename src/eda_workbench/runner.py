@@ -49,15 +49,7 @@ def _collect_csv_files(data_dir: str) -> list[str]:
 
 
 def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
-    """Process all CSV files in a folder and generate EDA reports.
-
-    For each CSV found, loads the dataset, runs the analyses,
-    and saves the report as a Markdown file in the output folder.
-
-    Args:
-        data_dir: Path to the folder containing CSV files. Default: "data".
-        output_dir: Path to the folder where reports will be saved. Default: "output".
-    """
+    """..."""
     csv_files = _collect_csv_files(data_dir)
     if not csv_files:
         return
@@ -65,12 +57,12 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
     config = load_config()
     limit = config.get("correlation", {}).get("drop_threshold", 0.9)
     min_pairwise_n = config.get("correlation", {}).get("min_pairwise_n", 30)
-    plot_mode = config.get("correlation", {}).get("plot_mode", "heatmap")
+    plot_mode = config.get("correlation", {}).get("plot_mode", "both")
     whisker_multiplier = config.get("outliers", {}).get("outlier_factor", 1.5)
     low_cardinality_threshold = config.get("data_types", {}).get(
         "low_cardinality_threshold", 10
     )
-    class_dist_threshold = config.get("class_distribution", {}).get(
+    default_class_dist_threshold = config.get("class_distribution", {}).get(
         "high_cardinality_threshold", 20
     )
 
@@ -82,6 +74,10 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         dataset_config = get_dataset_config(base_name, config)
 
         df = load_dataset(csv_path, dataset_config)
+
+        class_dist_threshold = dataset_config.get(
+            "high_cardinality_threshold", default_class_dist_threshold
+        )
 
         report = f"# EDA Report — {base_name}\n\n"
         report += analysis_provenance(
@@ -126,8 +122,6 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
                 f"({corr_folder}/correlation_violin.png)"
             )
 
-        # Paper Section 6 (identification): coverage §6.3, metrics §6.1/§5,
-        # SHAP as tabular §6.2 family. Never scores this profiled CSV.
         bias_cfg = config.get("bias", {})
         bias_result = identify_bias(
             df,

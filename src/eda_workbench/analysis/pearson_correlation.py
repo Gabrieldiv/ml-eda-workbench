@@ -13,7 +13,7 @@ def pearson_correlation(
     limit: float,
     min_pairwise_n: int = 30,
     low_cardinality_threshold: int = 10,
-    plot_mode: str = "heatmap",
+    plot_mode: str = "both",
 ) -> tuple[str, dict[str, plt.Figure], pd.DataFrame]:
     """Report pairs of highly correlated (redundant) characteristics.
 
@@ -51,7 +51,10 @@ def pearson_correlation(
             ordinal codes, since Pearson correlation may not be meaningful
             for them. Default: 10.
         plot_mode: One of "heatmap", "violin", or "both". Controls which
-            correlation plot(s) are generated. Default: "heatmap".
+            correlation plot(s) are generated. Default: "both".
+
+    Raises:
+        ValueError: If plot_mode is not one of "heatmap", "violin", or "both".
 
     Returns:
         A tuple of (markdown_text, figures, correlation_matrix):
@@ -77,6 +80,13 @@ def pearson_correlation(
 
     numeric_columns = list(df_feat.select_dtypes(include="number").columns)
     skipped_columns = list(df_feat.select_dtypes(exclude="number").columns)
+
+    valid_plot_modes = {"heatmap", "violin", "both"}
+    if plot_mode not in valid_plot_modes:
+        raise ValueError(
+            f"Invalid plot_mode: {plot_mode!r}. Must be one of "
+            f"{', '.join(sorted(valid_plot_modes))}."
+        )
 
     low_cardinality_columns = [
         f"{column} ({df_feat[column].nunique()} distinct values)"

@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from eda_workbench.analysis import pearson_correlation
 
@@ -316,25 +317,14 @@ def test_candidate_selection_ignores_insufficient_n_pairs():
     assert "| a <-> b | 0.929       | 8 out of 10 (80.0%) | b" in result
 
 
-def test_default_plot_mode_generates_heatmap_only():
-    """By default (plot_mode='heatmap'), only the heatmap figure is produced."""
+def test_default_plot_mode_generates_both_figures():
+    """By default (plot_mode='both'), both heatmap and violin figures are produced."""
     df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
     config = {"id_column": "id", "target_column": None}
     _, figures, matrix = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
     assert "heatmap" in figures
-    assert "violin" not in figures
-    assert not matrix.empty
-
-
-def test_plot_mode_both_generates_both_figures():
-    """plot_mode='both' produces both heatmap and violin figures."""
-    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
-    config = {"id_column": "id", "target_column": None}
-    _, figures, _ = pearson_correlation(
-        df, config, limit=0.9, min_pairwise_n=2, plot_mode="both"
-    )
-    assert "heatmap" in figures
     assert "violin" in figures
+    assert not matrix.empty
 
 
 def test_no_figures_or_matrix_when_fewer_than_two_numeric_columns():
@@ -401,3 +391,23 @@ def test_violin_not_generated_when_no_trustworthy_pairs_exist():
         plot_mode="violin",
     )
     assert figures == {}
+
+
+def test_invalid_plot_mode_raises_value_error():
+    """An unrecognized plot_mode raises immediately, rather than silently
+    producing no plots."""
+    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
+    config = {"id_column": "id", "target_column": None}
+    with pytest.raises(ValueError, match="Invalid plot_mode"):
+        pearson_correlation(df, config, limit=0.9, plot_mode="heatmp")
+
+
+def test_heatmap_only_mode_does_not_generate_violin():
+    """With plot_mode='heatmap' explicitly, no violin figure is generated."""
+    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
+    config = {"id_column": "id", "target_column": None}
+    _, figures, _ = pearson_correlation(
+        df, config, limit=0.9, min_pairwise_n=2, plot_mode="heatmap"
+    )
+    assert "heatmap" in figures
+    assert "violin" not in figures

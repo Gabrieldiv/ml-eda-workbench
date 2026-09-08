@@ -83,3 +83,43 @@ def test_process_folder_embeds_violin_plot_when_configured(tmp_path, monkeypatch
 
     content = reports[0].read_text(encoding="utf-8")
     assert "![Pearson Correlation Violin Plot]" in content
+
+
+def test_process_folder_honors_per_dataset_high_cardinality_threshold(
+    tmp_path, monkeypatch
+):
+    """A dataset-specific high_cardinality_threshold overrides the global
+    class_distribution default, resolved per-dataset inside the loop."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    # 25 distinct labels — above the global default (20), so without the
+    # override this would be truncated. Below the dataset-specific
+    # override (30), so with it, nothing should be truncated.
+    labels = [f"label_{i}" for i in range(25)]
+    (data_dir / "test.csv").write_text("label\n" + "\n".join(labels))
+
+    output_dir = tmp_path / "output"
+
+    fake_config = {
+        "datasets": {
+            "test": {
+                "label_columns": ["label"],
+                "high_cardinality_threshold": 30,
+            }
+        },
+        "class_distribution": {"high_cardinality_threshold": 20},
+    }
+    monkeypatch.setattr("eda_workbench.runner.load_config", lambda: fake_config)
+
+    process_folder(data_dir=str(data_dir), output_dir=str(output_dir))
+
+    reports = list(output_dir.glob("*.md"))
+    assert len(reports) > 0
+    content = reports[0].read_text(encoding="utf-8")
+
+    # If the global default (20) had been used instead of the
+    # dataset-specific override (30), this message would appear and some
+    # labels would be missing. Neither should happen here.
+    assert "High cardinality" not in content
+    assert content.count("- **label_") == 25
