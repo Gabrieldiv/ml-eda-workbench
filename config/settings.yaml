@@ -30,9 +30,7 @@ datasets:
     encoding: "utf-8"
     id_column: null
     target_column: "class"
-    # Multiple label columns — tests the multilabel path (frequency per
-    # column, plus the most common combination across all three).
-    label_columns: ["cap-color", "odor", "habitat"]
+    label_columns: ["class"]
 
 data:
   # Path to the directory containing your datasets
