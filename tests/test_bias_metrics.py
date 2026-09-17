@@ -6,6 +6,8 @@ import pytest
 from eda_workbench.bias.metric_audit import audit_metrics
 from eda_workbench.bias.prepare import (
     as_name_list,
+    configured_path,
+    imbalance_ratio,
     protected_attributes,
     resolve_thresholds,
     y_true_column,
@@ -128,3 +130,33 @@ def test_y_true_column_returns_none_without_label():
         y_true_column(pd.Index(["Survived", "y_pred"]), {"target_column": "Survived"})
         == "Survived"
     )
+
+
+def test_as_name_list_returns_empty_for_none():
+    """Returns an empty list when protected_attributes is not configured
+    at all (None), rather than a single-item list."""
+    assert as_name_list(None) == []
+
+
+def test_as_name_list_skips_empty_string_items():
+    """A stray empty (or whitespace-only) name in the YAML list is
+    silently dropped, not kept as an empty attribute name."""
+    assert as_name_list(["Sex", "", "  ", "Pclass"]) == ["Sex", "Pclass"]
+
+
+def test_configured_path_treats_empty_and_null_strings_as_unset():
+    """Treats an empty string, whitespace, and the literal strings
+    "null"/"None" the same as an actually-unset YAML value."""
+    assert configured_path("") is None
+    assert configured_path("   ") is None
+    assert configured_path("null") is None
+    assert configured_path("None") is None
+
+
+def test_imbalance_ratio_returns_nan_when_no_groups():
+    """Returns NaN (not raising) when there are no positive group counts
+    at all, e.g. an empty attribute column."""
+    import math
+
+    result = imbalance_ratio(pd.Series([], dtype=int))
+    assert math.isnan(result)

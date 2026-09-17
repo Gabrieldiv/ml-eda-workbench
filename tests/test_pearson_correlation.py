@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from eda_workbench.analysis import pearson_correlation
 
@@ -16,7 +17,7 @@ def test_skips_non_numeric_columns():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
     assert "**Skipped non-numeric characteristics**" in result
     assert "nome" in result
 
@@ -31,7 +32,7 @@ def test_no_numeric_columns():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
     assert "**No numeric characteristics found**" in result
 
 
@@ -45,7 +46,7 @@ def test_finds_redundant_pair():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
     assert "a <-> b" in result
     assert "1.000" in result
     assert "Candidate for Review" in result
@@ -61,7 +62,7 @@ def test_no_redundant_pairs():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
     assert "**All correlations below the defined limit (0.9)**" in result
 
 
@@ -75,7 +76,7 @@ def test_handles_constant_column():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
     assert "Could not compute correlation (not enough variation/data):" in result
     assert "`a` <-> `constante`" in result
 
@@ -92,7 +93,7 @@ def test_suggests_candidate_with_higher_mean_correlation():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
     assert "a <-> b" in result
     assert "b" in result.split("a <-> b")[1].split("\n")[0]
 
@@ -109,7 +110,7 @@ def test_blank_line_separates_skipped_columns_from_table():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
 
     assert "**Skipped non-numeric characteristics**" in result
     assert "| a <-> b" in result
@@ -128,7 +129,7 @@ def test_blank_line_separates_skipped_columns_from_nan_pairs():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
 
     assert "**Skipped non-numeric characteristics**" in result
     assert "**Low-cardinality numeric characteristics**" in result
@@ -146,7 +147,7 @@ def test_not_enough_numeric_columns():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
     assert "**Not enough numeric characteristics to compare" in result
 
 
@@ -169,7 +170,7 @@ def test_drop_suggestion_ignores_uncomputable_pairs():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    result, _, _ = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
 
     assert "`a` <-> `c`" in result
     assert "a <-> b" in result
@@ -187,7 +188,9 @@ def test_insufficient_pairwise_n_reported_separately():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)  # default min_pairwise_n=30
+    result, _, _ = pearson_correlation(
+        df, config, limit=0.9
+    )  # default min_pairwise_n=30
     assert "Insufficient overlapping data (fewer than 30" in result
     assert "`a` <-> `b` (N=10 out of 50, 20.0%)" in result
     assert "Candidate for Review" not in result
@@ -203,7 +206,7 @@ def test_sufficient_pairwise_n_shown_in_table():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
     assert "| a <-> b | 1.000       | 50" in result
 
 
@@ -219,7 +222,7 @@ def test_blank_line_separates_skipped_columns_from_insufficient_n():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9)
+    result, _, _ = pearson_correlation(df, config, limit=0.9)
 
     assert "**Skipped non-numeric characteristics**" in result
     assert "Insufficient overlapping data" in result
@@ -240,7 +243,7 @@ def test_nan_pairs_section_directly_after_header_when_nothing_else_present():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(
+    result, _, _ = pearson_correlation(
         df, config, limit=0.9, min_pairwise_n=2, low_cardinality_threshold=0
     )
     assert "## Pearson Correlation\n**Could not compute correlation" in result
@@ -257,7 +260,9 @@ def test_insufficient_n_section_directly_after_header_when_nothing_else_present(
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(df, config, limit=0.9, low_cardinality_threshold=0)
+    result, _, _ = pearson_correlation(
+        df, config, limit=0.9, low_cardinality_threshold=0
+    )
     assert "## Pearson Correlation\n**Insufficient overlapping data" in result
 
 
@@ -305,8 +310,104 @@ def test_candidate_selection_ignores_insufficient_n_pairs():
         }
     )
     config = {"id_column": "id", "target_column": None}
-    result = pearson_correlation(
+    result, _, _ = pearson_correlation(
         df, config, limit=0.85, min_pairwise_n=3, low_cardinality_threshold=0
     )
     assert "`a` <-> `c`" in result
     assert "| a <-> b | 0.929       | 8 out of 10 (80.0%) | b" in result
+
+
+def test_default_plot_mode_generates_both_figures():
+    """By default (plot_mode='both'), both heatmap and violin figures are produced."""
+    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
+    config = {"id_column": "id", "target_column": None}
+    _, figures, matrix = pearson_correlation(df, config, limit=0.9, min_pairwise_n=2)
+    assert "heatmap" in figures
+    assert "violin" in figures
+    assert not matrix.empty
+
+
+def test_no_figures_or_matrix_when_fewer_than_two_numeric_columns():
+    """Returns empty figures dict and empty matrix when there's nothing to plot."""
+    df = pd.DataFrame({"id": [1, 2, 3], "a": [10, 20, 30]})
+    config = {"id_column": "id", "target_column": None}
+    _, figures, matrix = pearson_correlation(df, config, limit=0.9)
+    assert figures == {}
+    assert matrix.empty
+
+
+def test_violin_excludes_insufficient_n_pairs_from_data():
+    """A characteristic's violin only includes correlations from trustworthy
+    (sufficient-N) pairs, not the ones excluded from the text report."""
+    df = pd.DataFrame(
+        {
+            "id": range(10),
+            "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+            "b": [
+                np.nan,
+                np.nan,
+                3.167,
+                3.402,
+                6.643,
+                6.245,
+                7.502,
+                7.576,
+                10.577,
+                9.081,
+            ],
+            "c": [10.0, 90.0] + [np.nan] * 8,
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    _, figures, _ = pearson_correlation(
+        df,
+        config,
+        limit=0.85,
+        min_pairwise_n=3,
+        low_cardinality_threshold=0,
+        plot_mode="violin",
+    )
+    assert "violin" in figures
+
+
+def test_violin_not_generated_when_no_trustworthy_pairs_exist():
+    """When every pair has insufficient N, no characteristic has trustworthy
+    correlation data to plot, so no violin figure is generated."""
+    df = pd.DataFrame(
+        {
+            "id": range(10),
+            "a": [1, 2] + [np.nan] * 8,
+            "b": [3, 4] + [np.nan] * 8,
+            "c": [5, 6] + [np.nan] * 8,
+        }
+    )
+    config = {"id_column": "id", "target_column": None}
+    _, figures, _ = pearson_correlation(
+        df,
+        config,
+        limit=0.9,
+        min_pairwise_n=30,
+        low_cardinality_threshold=0,
+        plot_mode="violin",
+    )
+    assert figures == {}
+
+
+def test_invalid_plot_mode_raises_value_error():
+    """An unrecognized plot_mode raises immediately, rather than silently
+    producing no plots."""
+    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
+    config = {"id_column": "id", "target_column": None}
+    with pytest.raises(ValueError, match="Invalid plot_mode"):
+        pearson_correlation(df, config, limit=0.9, plot_mode="heatmp")
+
+
+def test_heatmap_only_mode_does_not_generate_violin():
+    """With plot_mode='heatmap' explicitly, no violin figure is generated."""
+    df = pd.DataFrame({"id": range(10), "a": range(10), "b": range(10)})
+    config = {"id_column": "id", "target_column": None}
+    _, figures, _ = pearson_correlation(
+        df, config, limit=0.9, min_pairwise_n=2, plot_mode="heatmap"
+    )
+    assert "heatmap" in figures
+    assert "violin" not in figures

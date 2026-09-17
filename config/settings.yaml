@@ -4,12 +4,14 @@ datasets:
     encoding: "utf-8"
     id_column: "id"
     target_column: "diagnostico"
+    label_columns: ["diagnostico"]
   
   titanic_train:
     separator: ","
     encoding: "utf-8"
     id_column: "PassengerId"
     target_column: "Survived"
+    label_columns: ["Survived"]
     # Grouping columns in this CSV (not inferred). Pclass = ticket class 1/2/3.
     protected_attributes: [Sex, Pclass]
     eval_path: null  # e.g. data/titanic_eval.csv — NOT the profiled file
@@ -21,6 +23,14 @@ datasets:
     encoding: "utf-8"
     id_column: null
     target_column: "specie"
+    label_columns: ["specie"]
+
+  mushroom:
+    separator: ","
+    encoding: "utf-8"
+    id_column: null
+    target_column: "class"
+    label_columns: ["class"]
 
 data:
   # Path to the directory containing your datasets
@@ -50,6 +60,8 @@ correlation:
   # pairwise correlation. Pairs with fewer valid rows are reported as
   # insufficient data instead of being evaluated against drop_threshold.
   min_pairwise_n: 30
+    # Which correlation plot(s) to generate: "heatmap", "violin", or "both".
+  plot_mode: "both"
 
 data_types:
   # Numeric characteristics with this many or fewer distinct values are
@@ -101,3 +113,9 @@ bias:
   shap_explain_size: 100
   # Flag features whose mean SHAP differs across groups by more than this
   shap_attribution_gap_threshold: 0.1
+
+class_distribution:
+  # Label column(s) with more distinct values than this are truncated to
+  # their most frequent values, with a note. Applies per dataset unless
+  # overridden.
+  high_cardinality_threshold: 20

@@ -9,6 +9,7 @@ from eda_workbench.io import (
     get_dataset_config,
     load_config,
     load_dataset,
+    save_correlation_outputs,
     save_markdown,
     save_plot,
 )
@@ -131,3 +132,41 @@ def test_save_plot_closes_figure_after_saving(tmp_path):
     open_after = len(plt.get_fignums())
 
     assert open_after == open_before - 1
+
+
+def test_save_correlation_outputs_skips_csv_when_matrix_empty_but_figure_present(
+    tmp_path,
+):
+    """Does not write correlation_matrix.csv when the matrix is empty,
+    even though a figure was still provided."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3])
+
+    folder = save_correlation_outputs(
+        {"heatmap": fig}, pd.DataFrame(), "wine", output_dir=str(tmp_path)
+    )
+    saved_files = os.listdir(tmp_path / folder)
+
+    assert "correlation_matrix.csv" not in saved_files
+    assert "correlation_heatmap.png" in saved_files
+
+
+def test_save_correlation_outputs_saves_violin_figure(tmp_path):
+    """Saves correlation_violin.png when only the violin figure is present,
+    without a heatmap."""
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ax.violinplot([[1, 2, 3]])
+    matrix = pd.DataFrame({"a": [1.0, 0.5], "b": [0.5, 1.0]}, index=["a", "b"])
+
+    folder = save_correlation_outputs(
+        {"violin": fig}, matrix, "wine", output_dir=str(tmp_path)
+    )
+    saved_files = os.listdir(tmp_path / folder)
+
+    assert "correlation_violin.png" in saved_files
+    assert "correlation_heatmap.png" not in saved_files
+    assert "correlation_matrix.csv" in saved_files
