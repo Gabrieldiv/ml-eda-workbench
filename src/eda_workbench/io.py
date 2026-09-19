@@ -1,11 +1,13 @@
 """I/O utilities — loading datasets and saving reports."""
 
+import json
 import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import yaml
+from fpdf import FPDF
 from matplotlib.figure import Figure
 
 from eda_workbench.bias.prepare import as_name_list
@@ -126,6 +128,45 @@ def save_markdown(content: str, csv_path: str, output_dir: str = "output") -> st
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
+    return path
+
+
+def save_json(data: dict, csv_path: str, output_dir: str = "output") -> str:
+    """Save a report dict to a JSON file.
+
+    Args:
+        data: Dict to serialize (typically built from render_*_json calls).
+        csv_path: Path to the source CSV, used to name the file.
+        output_dir: Directory where the file will be saved. Default: "output".
+
+    Returns:
+        Full path of the generated JSON file.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    file_name = os.path.basename(csv_path)
+    base_name, _ = os.path.splitext(file_name)
+    path = os.path.join(output_dir, f"{base_name}_report.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    return path
+
+
+def save_pdf(pdf: FPDF, csv_path: str, output_dir: str = "output") -> str:
+    """Save an in-progress FPDF document to a PDF file.
+
+    Args:
+        pdf: The FPDF document, already populated by render_*_pdf calls.
+        csv_path: Path to the source CSV, used to name the file.
+        output_dir: Directory where the file will be saved. Default: "output".
+
+    Returns:
+        Full path of the generated PDF file.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    file_name = os.path.basename(csv_path)
+    base_name, _ = os.path.splitext(file_name)
+    path = os.path.join(output_dir, f"{base_name}_report.pdf")
+    pdf.output(path)
     return path
 
 

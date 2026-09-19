@@ -60,7 +60,7 @@ correlation:
   # pairwise correlation. Pairs with fewer valid rows are reported as
   # insufficient data instead of being evaluated against drop_threshold.
   min_pairwise_n: 30
-    # Which correlation plot(s) to generate: "heatmap", "violin", or "both".
+  # Which correlation plot(s) to generate: "heatmap", "violin", or "both".
   plot_mode: "both"
 
 data_types:
@@ -119,3 +119,9 @@ class_distribution:
   # their most frequent values, with a note. Applies per dataset unless
   # overridden.
   high_cardinality_threshold: 20
+
+output:
+  # Optional formats generated alongside the always-on Markdown report.
+  # Currently only covers converted sections (Missing Values so far) —
+  # more sections join as more analyses migrate to the new pattern.
+  extra_formats: ["json", "pdf"]  # any combination of: "json", "pdf"

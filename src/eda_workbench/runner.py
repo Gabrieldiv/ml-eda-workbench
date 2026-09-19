@@ -2,6 +2,8 @@
 
 import os
 
+from fpdf import FPDF
+
 from eda_workbench.analysis import (
     analysis_provenance,
     basic_info,
@@ -19,9 +21,14 @@ from eda_workbench.io import (
     load_config,
     load_dataset,
     save_correlation_outputs,
+    save_json,
     save_markdown,
+    save_pdf,
     save_plot,
 )
+from eda_workbench.printout.json_exit import render_missing_values_json
+from eda_workbench.printout.markdown_exit import render_missing_values
+from eda_workbench.printout.pdf_exit import render_missing_values_pdf
 from eda_workbench.reporting.bias import render_bias_identification
 
 # -----------------------------------------------------------------------------
@@ -49,7 +56,19 @@ def _collect_csv_files(data_dir: str) -> list[str]:
 
 
 def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
-    """..."""
+    """Process all CSV files in a folder and generate EDA reports.
+
+    For each CSV found, loads the dataset, runs the analyses,
+    and saves the report as a Markdown file in the output folder.
+    Additional formats (JSON, PDF) are generated alongside it when
+    configured via ``output.extra_formats`` in settings.yaml — currently
+    covering only the sections already migrated to the structured
+    dataclass pattern (Missing Values so far).
+
+    Args:
+        data_dir: Path to the folder containing CSV files. Default: "data".
+        output_dir: Path to the folder where reports will be saved. Default: "output".
+    """
     csv_files = _collect_csv_files(data_dir)
     if not csv_files:
         return
@@ -65,6 +84,7 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
     default_class_dist_threshold = config.get("class_distribution", {}).get(
         "high_cardinality_threshold", 20
     )
+    extra_formats = config.get("output", {}).get("extra_formats", [])
 
     for csv_path in csv_files:
         print(f"\nProcessing: {csv_path}")
@@ -89,11 +109,25 @@ def process_folder(data_dir: str = "data", output_dir: str = "output") -> None:
         )
 
         report += f"\n\n{basic_info(df, dataset_config)}"
-        report += "\n\n## Missing Values\n"
-        report += (
-            f"- **Instances with missing values**: {missing_values(df)} "
-            f"out of {len(df)}"
-        )
+
+        missing_values_result = missing_values(df)
+        report += f"\n\n{render_missing_values(missing_values_result)}"
+
+        if "json" in extra_formats:
+            report_json = {
+                "dataset": base_name,
+                "missing_values": render_missing_values_json(missing_values_result),
+            }
+            json_path = save_json(report_json, csv_path, output_dir=output_dir)
+            print(f"JSON report saved to: {json_path}")
+
+        if "pdf" in extra_formats:
+            pdf_doc = FPDF()
+            pdf_doc.add_page()
+            render_missing_values_pdf(pdf_doc, missing_values_result)
+            pdf_path = save_pdf(pdf_doc, csv_path, output_dir=output_dir)
+            print(f"PDF report saved to: {pdf_path}")
+
         report += f"\n\n{zero_values(df, dataset_config)}"
         report += f"\n\n{duplicated_instances(df, dataset_config)}"
         report += f"\n\n{class_distribution(df, dataset_config, class_dist_threshold)}"
