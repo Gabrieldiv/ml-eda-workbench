@@ -15,29 +15,39 @@ def pearson_correlation(
     low_cardinality_threshold: int = 10,
     plot_mode: str = "both",
 ) -> tuple[str, dict[str, plt.Figure], pd.DataFrame]:
-    """Report pairs of highly correlated (redundant) characteristics.
+    """Report correlation with the target, and pairs of highly correlated
+    (redundant) characteristics.
 
-    Compares every pair of numeric characteristics via Pearson correlation,
-    excluding the ID and target columns. For each pair, the number of rows
-    with valid (non-null) data in BOTH columns (N) is checked against
+    First reports, for every numeric characteristic, its Pearson
+    correlation with the configured target column (when numeric), sorted
+    by absolute strength — descending, regardless of sign. Then compares
+    every pair of numeric characteristics against each other, excluding
+    the ID and target columns.
+
+    For each correlation computed anywhere in this function — with the
+    target, or between characteristics — the number of rows with valid
+    (non-null) data in BOTH columns (N) is checked against
     ``min_pairwise_n``: with too few overlapping points, a correlation can
     be misleadingly close to +-1.0 by chance, so such pairs are reported
-    separately as insufficient data rather than evaluated against `limit`.
+    separately as insufficient data rather than evaluated normally.
 
-    Among pairs with enough data, those with absolute correlation at or
-    above `limit` are flagged as redundant. For each flagged pair, lists a
-    candidate for manual review, based on its average correlation with
-    every other characteristic. This is a heuristic starting point, not an
-    automatic removal decision: it does not account for target association,
-    missingness, domain meaning, or validation performance.
+    Among characteristic pairs with enough data, those with absolute
+    correlation at or above `limit` are flagged as redundant. For each
+    flagged pair, lists a candidate for manual review, based on its
+    average correlation with every other characteristic. This is a
+    heuristic starting point, not an automatic removal decision: it does
+    not account for target association, missingness, domain meaning, or
+    validation performance.
 
     Depending on ``plot_mode``, also builds a heatmap of the full
-    correlation matrix, a violin plot of each characteristic's correlation
-    distribution with every other characteristic, or both. In both plots,
-    pairs with insufficient N are masked out (not shown), for the same
-    reason they are excluded from the "Candidate for Review" heuristic and
-    reported separately in the text: an untrustworthy correlation should
-    not visually read as a real relationship.
+    characteristic-to-characteristic correlation matrix, a violin plot of
+    each characteristic's correlation distribution with every other
+    characteristic, or both. In both plots, pairs with insufficient N are
+    masked out (not shown), for the same reason they are excluded from
+    the "Candidate for Review" heuristic and reported separately in the
+    text: an untrustworthy correlation should not visually read as a real
+    relationship. These plots cover characteristic-to-characteristic
+    correlation only, not correlation with the target.
 
     Args:
         df: DataFrame with the dataset data.
@@ -46,10 +56,10 @@ def pearson_correlation(
             characteristics are considered redundant.
         min_pairwise_n: Minimum number of overlapping non-null rows required
             to trust a pairwise correlation. Default: 30.
-        low_cardinality_threshold: Numeric characteristics with this many or
-            fewer distinct values are flagged as potentially categorical or
-            ordinal codes, since Pearson correlation may not be meaningful
-            for them. Default: 10.
+        low_cardinality_threshold: Numeric characteristics (or the target)
+            with this many or fewer distinct values are flagged as
+            potentially categorical or ordinal codes, since Pearson
+            correlation may not be meaningful for them. Default: 10.
         plot_mode: One of "heatmap", "violin", or "both". Controls which
             correlation plot(s) are generated. Default: "both".
 
@@ -58,18 +68,22 @@ def pearson_correlation(
 
     Returns:
         A tuple of (markdown_text, figures, correlation_matrix):
-        - markdown_text: table of redundant characteristic pairs (including
-          N), their correlation, and a candidate for manual review. Also
-          lists skipped non-numeric characteristics, low-cardinality
-          numeric characteristics, pairs whose correlation could not be
-          computed, and pairs with insufficient overlapping data.
+        - markdown_text: correlation of each characteristic with the
+          target (when the target is numeric), then the table of
+          redundant characteristic pairs (including N), their
+          correlation, and a candidate for manual review. Also lists
+          skipped non-numeric characteristics, low-cardinality numeric
+          characteristics, pairs whose correlation could not be computed,
+          and pairs (with the target or between characteristics) with
+          insufficient overlapping data.
         - figures: dict with keys "heatmap" and/or "violin" mapping to the
-          generated Figure objects, per ``plot_mode``. Empty when there are
-          fewer than two numeric characteristics to compare.
-        - correlation_matrix: the full raw Pearson correlation matrix
-          (unmasked), for callers that want to export it (e.g. as CSV).
-          Empty DataFrame when there are fewer than two numeric
-          characteristics to compare.
+          generated Figure objects (characteristic-to-characteristic
+          only), per ``plot_mode``. Empty when there are fewer than two
+          numeric characteristics to compare.
+        - correlation_matrix: the full raw characteristic-to-characteristic
+          Pearson correlation matrix (unmasked), for callers that want to
+          export it (e.g. as CSV). Empty DataFrame when there are fewer
+          than two numeric characteristics to compare.
     """
     id_column = config.get("id_column")
     target_column = config.get("target_column")
@@ -104,6 +118,24 @@ def pearson_correlation(
             "- **Low-cardinality numeric characteristics** (may be categorical/ordinal "
             f"codes, not continuous measures): {', '.join(low_cardinality_columns)}"
         )
+
+    # -------------------------------------------------------------------
+    # Correlation with the target — reported first, independent of
+    # whether there are enough characteristics to compare against each
+    # other below.
+    # -------------------------------------------------------------------
+    if numeric_columns:
+        target_lines = _target_correlation_lines(
+            df,
+            target_column,
+            numeric_columns,
+            min_pairwise_n,
+            low_cardinality_threshold,
+        )
+        if target_lines:
+            lines.append("")
+            lines.append("### Correlation with Target")
+            lines.extend(target_lines)
 
     if not numeric_columns:
         lines.append("- **No numeric characteristics found**")
@@ -159,25 +191,24 @@ def pearson_correlation(
     )
 
     if nan_pairs.empty and insufficient_n_pairs.empty and redundant_pairs.empty:
-        lines.append(f"- **All correlations below the defined limit ({limit})**")
+        lines.append("")
+        lines.append(
+            f"- **All pairwise correlations below the defined limit ({limit})**"
+        )
         figures = _build_correlation_plots(
             correlation_matrix, trustworthy_mask, plot_mode
         )
         return "\n".join(lines), figures, correlation_matrix
 
     if not nan_pairs.empty:
-        if len(lines) > 1:
-            lines.append("")
-
+        lines.append("")
         lines.append("**Could not compute correlation (not enough variation/data):**")
         lines.append("")
         for column_a, column_b in nan_pairs.index:
             lines.append(f"- `{column_a}` <-> `{column_b}`")
 
     if not insufficient_n_pairs.empty:
-        if len(lines) > 1:
-            lines.append("")
-
+        lines.append("")
         lines.append(
             f"**Insufficient overlapping data (fewer than {min_pairwise_n} "
             "valid pairs, correlation not evaluated):**"
@@ -219,9 +250,7 @@ def pearson_correlation(
         col3_width = max(len(headers[2]), max(len(r[2]) for r in rows))
         col4_width = max(len(headers[3]), max(len(r[3]) for r in rows))
 
-        if len(lines) > 1:
-            lines.append("")
-
+        lines.append("")
         lines.append(
             "**Candidate for Review**: based on average correlation only, "
             "not an automatic removal decision."
@@ -244,6 +273,120 @@ def pearson_correlation(
 
     figures = _build_correlation_plots(correlation_matrix, trustworthy_mask, plot_mode)
     return "\n".join(lines), figures, correlation_matrix
+
+
+def _target_correlation_lines(
+    df: pd.DataFrame,
+    target_column: str | None,
+    numeric_columns: list[str],
+    min_pairwise_n: int,
+    low_cardinality_threshold: int,
+) -> list[str]:
+    """Build the "Correlation with Target" section, or an empty list when
+    there's nothing to report (target not configured).
+
+    Args:
+        df: The full, original DataFrame (target_column must still be
+            present in it — this is called before target is dropped).
+        target_column: Configured target column name, or None.
+        numeric_columns: Numeric characteristic columns to correlate
+            against the target (already excludes id_column/target_column).
+        min_pairwise_n: Same meaning as in ``pearson_correlation``.
+        low_cardinality_threshold: Same meaning as in ``pearson_correlation``.
+
+    Returns:
+        Markdown lines for this section. Empty when target_column is not
+        configured at all.
+    """
+    if target_column is None:
+        return []
+
+    lines: list[str] = []
+
+    if target_column not in df.columns:
+        lines.append(
+            f"- **Configured target_column not found in dataset**: {target_column}"
+        )
+        return lines
+
+    target_series = df[target_column]
+
+    if not pd.api.types.is_numeric_dtype(target_series):
+        lines.append(
+            f"- **Correlation with target not applicable**: `{target_column}` is "
+            "not numeric (Pearson correlation requires two numeric variables)"
+        )
+        return lines
+
+    target_distinct = target_series.nunique()
+    if target_distinct <= low_cardinality_threshold:
+        lines.append(
+            f"- **Target `{target_column}` has low cardinality** "
+            f"({target_distinct} distinct values) — may be categorical/ordinal "
+            "codes, not a continuous measure"
+        )
+
+    total_rows = len(df)
+    sufficient_rows: list[tuple[str, float, int]] = []
+    insufficient_rows: list[tuple[str, int]] = []
+
+    for column in numeric_columns:
+        feature_series = df[column]
+        valid_mask = feature_series.notna() & target_series.notna()
+        n = int(valid_mask.sum())
+
+        if n < min_pairwise_n:
+            insufficient_rows.append((column, n))
+            continue
+
+        corr = feature_series[valid_mask].corr(target_series[valid_mask])
+        if pd.isna(corr):
+            continue
+        sufficient_rows.append((column, float(corr), n))
+
+    sufficient_rows.sort(key=lambda row: abs(row[1]), reverse=True)
+
+    if insufficient_rows:
+        lines.append("")
+        lines.append(
+            "**Insufficient overlapping data with target (fewer than "
+            f"{min_pairwise_n} valid pairs, correlation not evaluated):**"
+        )
+        lines.append("")
+        for column, n in insufficient_rows:
+            pct = 100 * n / total_rows
+            lines.append(f"- `{column}` (N={n} out of {total_rows}, {pct:.1f}%)")
+
+    if sufficient_rows:
+        headers = ("Characteristic", "Correlation with Target", "N")
+        rows_text = [
+            (
+                column,
+                f"{corr:.3f}",
+                f"{n} out of {total_rows} ({100 * n / total_rows:.1f}%)",
+            )
+            for column, corr, n in sufficient_rows
+        ]
+        col1_width = max(len(headers[0]), max(len(r[0]) for r in rows_text))
+        col2_width = max(len(headers[1]), max(len(r[1]) for r in rows_text))
+        col3_width = max(len(headers[2]), max(len(r[2]) for r in rows_text))
+
+        lines.append("")
+        lines.append(
+            f"| {headers[0]:<{col1_width}} | {headers[1]:<{col2_width}} | "
+            f"{headers[2]:<{col3_width}} |"
+        )
+        lines.append(
+            f"|{'-' * (col1_width + 2)}|{'-' * (col2_width + 2)}|"
+            f"{'-' * (col3_width + 2)}|"
+        )
+        for column, corr_text, n_text in rows_text:
+            lines.append(
+                f"| {column:<{col1_width}} | {corr_text:<{col2_width}} | "
+                f"{n_text:<{col3_width}} |"
+            )
+
+    return lines
 
 
 def _build_correlation_plots(
